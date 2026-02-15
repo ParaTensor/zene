@@ -37,17 +37,25 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Rename Binary (Linux/macOS)
+      - name: Package (Linux/macOS)
         if: matrix.os != 'windows-latest'
-        run: mv target/${{ matrix.target }}/release/zene target/${{ matrix.target }}/release/${{ matrix.name }}
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czf ../../../${{ matrix.name }}.tar.gz zene
+          cd -
 
-      - name: Rename Binary (Windows)
+      - name: Package (Windows)
         if: matrix.os == 'windows-latest'
-        run: mv target/${{ matrix.target }}/release/zene.exe target/${{ matrix.target }}/release/${{ matrix.name }}
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ../../../${{ matrix.name }}.zip zene.exe
+          cd -
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: target/${{ matrix.target }}/release/${{ matrix.name }}
+          files: |
+            ${{ matrix.name }}.tar.gz
+            ${{ matrix.name }}.zip
           generate_release_notes: true
