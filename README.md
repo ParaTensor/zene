@@ -1,1 +1,73 @@
-# zene
+# Zene
+
+> A minimalist, high-performance AI coding engine written in Rust.
+
+**Zene** is a headless AI coding agent designed to understand your codebase and execute complex programming tasks. It acts as an intelligent backend that can be integrated into CLI tools, IDEs, or other agentic workflows via standard JSON-RPC.
+
+## 🚀 Key Features
+
+*   **Model Agnostic**: Built on `llm-connector`, supporting OpenAI, Anthropic, DeepSeek, Google Gemini, and more.
+*   **Context Aware**: Uses `tree-sitter` for syntax-level code analysis and efficient file walking to understand project structure.
+*   **Safe Execution**: Features an OODA (Observe-Orient-Decide-Act) loop with "Dry Run" capabilities and atomic file operations.
+*   **JSON-RPC Server**: Functions as a standard server, exposing its capabilities to IDEs and other tools.
+*   **Blazing Fast**: Written in pure Rust with async I/O.
+
+## 📦 Installation
+
+### Prerequisites
+*   Rust toolchain (cargo)
+
+### Build from Source
+```bash
+git clone https://github.com/lipish/zene.git
+cd zene
+cargo build --release
+```
+
+## 🛠️ Usage
+
+### 1. Set API Key
+Zene prioritizes DeepSeek but supports OpenAI as a fallback.
+
+```bash
+export DEEPSEEK_API_KEY="sk-..."
+# OR
+export OPENAI_API_KEY="sk-..."
+```
+
+### 2. Run a Task (One-Shot)
+Execute a single instruction directly from the command line.
+
+```bash
+# Create a file
+cargo run -- run "Create a hello.txt with content 'Hello Zene'"
+
+# Refactor code (Context aware)
+cargo run -- run "Refactor src/main.rs to extract the CLI logic into a separate module"
+
+# Fetch Web Content
+cargo run -- run "Fetch https://example.com and summarize it in README.md"
+```
+
+### 3. Server Mode
+Start Zene as a JSON-RPC server.
+
+```bash
+cargo run -- server
+```
+
+## 📚 Documentation
+
+*   [Architecture Design](docs/ARCHITECTURE.md)
+*   [Agent Workflow](docs/AGENT_FLOW.md)
+*   [Context Strategy](docs/CONTEXT_STRATEGY.md)
+*   [Comparison with Codex](docs/comparison_with_codex.md)
+*   [Plugin Architecture](docs/plugin_architecture.md)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read our architecture documentation to understand the core philosophy before submitting PRs.
+
+## 📄 License
+
+MIT
