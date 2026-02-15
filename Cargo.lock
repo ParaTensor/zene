@@ -770,7 +770,8 @@ checksum = "6373607a59f0be73a39b6fe456b8192fcc3585f602af20751600e974dd455e77"
 [[package]]
 name = "llm-connector"
 version = "0.6.0"
-source = "git+https://github.com/lipish/llm-connector#884b3b979b3be4ac09ca7dd10a4827c4a6461406"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "550454c78b018e475aaf954b8297d80dee308ffb55648bd73d5f3e7a3690cbfc"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2219,7 +2220,7 @@ dependencies = [
 
 [[package]]
 name = "zene"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
