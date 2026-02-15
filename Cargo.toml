@@ -1,0 +1,11 @@
+[package]
+name = "zene"
+version = "0.0.1"
+edition = "2021"
+description = "A minimalist, high-performance coding engine."
+license = "MIT"
+repository = "https://github.com/mariozechner/zene"
+keywords = ["coding", "agent", "engine", "ai", "rust"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
