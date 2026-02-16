@@ -46,8 +46,9 @@ impl AgentRunner {
                  1. EXPLORE: Use `list_files` to explore subdirectories.\n\
                  2. SEARCH: Use `search_code` to find relevant code patterns (grep). This is preferred over reading every file.\n\
                  3. READ: Use `read_file` to examine specific file contents.\n\
-                 4. EDIT: Use `write_file` to modify files (Always read first!).\n\
-                 5. EXECUTE: Use `run_command` for shell operations.\n\
+                 4. EDIT: Use `write_file` to create new files or overwrite small files.\n\
+                 5. PATCH: Use `apply_patch` to modify large files by replacing specific code blocks (Search & Replace).\n\
+                 6. EXECUTE: Use `run_command` for shell operations.\n\
                  \n\
                  Think step-by-step. Do not guess file paths.",
                 files
@@ -107,7 +108,7 @@ impl AgentRunner {
                 let args: serde_json::Value =
                     serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
 
-                let result_content = if (tool_name == "run_command" || tool_name == "write_file")
+                let result_content = if (tool_name == "run_command" || tool_name == "write_file" || tool_name == "apply_patch")
                     && !self.user_interface.confirm_execution(tool_name, args_str)
                 {
                     "User denied execution".to_string()
@@ -171,6 +172,21 @@ impl AgentRunner {
                             match ToolManager::list_files(path, depth) {
                                 Ok(files) => format!("Files:\n{}", files.join("\n")),
                                 Err(e) => format!("Error listing files: {}", e),
+                            }
+                        }
+                        "apply_patch" => {
+                            let path = args.get("path").and_then(|v| v.as_str());
+                            let original = args.get("original_snippet").and_then(|v| v.as_str());
+                            let new = args.get("new_snippet").and_then(|v| v.as_str());
+                            let start_line = args.get("start_line").and_then(|v| v.as_i64());
+                            
+                            if let (Some(p), Some(o), Some(n)) = (path, original, new) {
+                                match ToolManager::apply_patch(p, o, n, start_line) {
+                                    Ok(_) => "Patch applied successfully".to_string(),
+                                    Err(e) => format!("Error applying patch: {}", e),
+                                }
+                            } else {
+                                "Error: Missing arguments (path, original_snippet, new_snippet)".to_string()
                             }
                         }
                         _ => format!("Error: Unknown tool {}", tool_name),

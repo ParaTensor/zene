@@ -42,3 +42,11 @@ walkdir = "2.3" # For directory traversal (if needed, but ignore is better)
 
 # Optional: For future MCP or LSP implementation
 # tower-lsp = "0.20" 
+
+[lib]
+name = "zene"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zene"
+path = "src/main.rs" 
