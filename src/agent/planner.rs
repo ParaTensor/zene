@@ -87,10 +87,10 @@ Example:
         // Convert strings to Task objects
         let tasks = plan_output.tasks.into_iter().enumerate().map(|(i, desc)| {
             Task {
-                id: format!("{}", i + 1),
+                id: i + 1,
                 description: desc,
                 status: TaskStatus::Pending,
-                dependencies: if i > 0 { vec![format!("{}", i)] } else { vec![] },
+                result: None,
             }
         }).collect();
 
