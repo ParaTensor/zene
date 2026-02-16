@@ -1,23 +1,22 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum TaskStatus {
     Pending,
     InProgress,
     Completed,
     Failed,
-    Skipped,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Task {
-    pub id: String,
+    pub id: usize,
     pub description: String,
     pub status: TaskStatus,
-    pub dependencies: Vec<String>, // Task IDs
+    pub result: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Plan {
     pub goal: String,
     pub tasks: Vec<Task>,

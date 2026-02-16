@@ -4,6 +4,7 @@ use tracing::{info, warn};
 
 use crate::agent::client::AgentClient;
 use crate::agent::planner::Planner;
+use crate::agent::reflector::Reflector;
 use crate::engine::context::ContextEngine;
 use crate::engine::plan::{Task, TaskStatus};
 use crate::engine::session::Session;
@@ -68,15 +69,20 @@ impl AgentRunner {
         }
 
         // Step 2: Execute Plan Loop
-        // We will execute one task at a time (or multiple if configured), but for now,
-        // let's try to make progress on the current plan.
-        
         let mut final_result = String::new();
 
         // Check if we have a valid plan
         if let Some(plan) = &mut session.plan {
-            // Find next pending task
-            while let Some(current_task) = plan.next_task() {
+            // Use while loop with index to allow dynamic insertion of tasks
+            let mut i = 0;
+            while i < plan.tasks.len() {
+                // Check if task is pending
+                if plan.tasks[i].status != TaskStatus::Pending {
+                    i += 1;
+                    continue;
+                }
+
+                let current_task = &mut plan.tasks[i];
                 info!("Executing Task {}: {}", current_task.id, current_task.description);
                 
                 // Add context to history about what we are working on
@@ -85,19 +91,58 @@ impl AgentRunner {
                     current_task.id, current_task.description
                 )));
 
+                current_task.status = TaskStatus::InProgress;
+
                 match self.execute_task(current_task, session.history.clone()).await {
                     Ok(output) => {
-                        current_task.status = TaskStatus::Completed;
                         info!("Task {} Completed", current_task.id);
+                        current_task.result = Some(output.clone());
                         final_result.push_str(&format!("Task {}: Completed\n", current_task.id));
                         
-                        // Add task completion note to history to keep context for next tasks
-                        // We append the result to the main session history so subsequent tasks know what happened
+                        // Add task completion note to history
                         session.history.push(Message::system(&format!(
                             "Task '{}' completed. Summary of work:\n{}", 
                             current_task.description, 
-                            output.chars().take(500).collect::<String>() // Truncate history slightly
+                            output.chars().take(500).collect::<String>()
                         )));
+
+                        // 3. Reflect (Self-Healing)
+                        let reflector = Reflector::new(self.reflector_client.clone());
+                        match reflector.review_task(current_task, &output).await {
+                            Ok(review) => {
+                                if review.passed {
+                                    info!("Reflector APPROVED Task {}", current_task.id);
+                                    current_task.status = TaskStatus::Completed;
+                                } else {
+                                    warn!("Reflector REJECTED Task {}: {}", current_task.id, review.reason);
+                                    current_task.status = TaskStatus::Failed;
+                                    
+                                    // Create a Fix Task
+                                    let fix_description = format!(
+                                        "Fix issues in previous task ({}): {}. Suggestion: {}", 
+                                        current_task.description, 
+                                        review.reason, 
+                                        review.suggestions.unwrap_or_default()
+                                    );
+                                    
+                                    let fix_task = Task {
+                                        id: plan.tasks.len() + 1, // Simple ID generation
+                                        description: fix_description,
+                                        status: TaskStatus::Pending,
+                                        result: None,
+                                    };
+                                    
+                                    info!("Adding FIX Task: {}", fix_task.description);
+                                    plan.tasks.insert(i + 1, fix_task);
+                                    // Don't increment i, so we process the next task (which is the fix task) immediately
+                                    // Actually, we increment i at the end of loop, so inserting at i+1 puts it next.
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Reflector failed: {}. Assuming task passed.", e);
+                                current_task.status = TaskStatus::Completed;
+                            }
+                        }
                     }
                     Err(e) => {
                         current_task.status = TaskStatus::Failed;
@@ -113,6 +158,7 @@ impl AgentRunner {
                         return Ok(final_result); // Stop on failure for now
                     }
                 }
+                i += 1;
             }
             
             if final_result.is_empty() {
