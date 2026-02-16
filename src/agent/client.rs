@@ -29,7 +29,10 @@ impl AgentClient {
                 "volcengine" => LlmClient::volcengine(&config.api_key)?,
                 "moonshot" => LlmClient::moonshot(&config.api_key)?,
                 "xiaomi" => LlmClient::xiaomi(&config.api_key)?,
-                // "minimax" => LlmClient::minimax(&config.api_key)?, 
+                "minimax" => LlmClient::openai_with_base_url(
+                    &config.api_key, 
+                    "https://api.minimaxi.com/v1"
+                )?,
                 "ollama" => LlmClient::ollama()?,
                 _ => return Err(anyhow::anyhow!("Unsupported provider: {}", config.provider)),
             }
