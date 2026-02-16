@@ -1,49 +1,44 @@
 use anyhow::Result;
 use llm_connector::{
-    types::{ChatRequest, ChatResponse, Message, Role, Tool, ToolChoice},
+    types::{ChatRequest, ChatResponse, Message, Tool, ToolChoice},
     LlmClient,
 };
+use crate::config::RoleConfig;
 
+#[derive(Clone)]
 pub struct AgentClient {
     client: LlmClient,
     model: String,
 }
 
 impl AgentClient {
-    /// Initialize the agent client with a specific provider
-    pub fn new(provider: &str, api_key: &str) -> Result<Self> {
-        let client = match provider {
-            "openai" => LlmClient::openai(api_key)?,
-            "anthropic" => LlmClient::anthropic(api_key)?,
-            "deepseek" => LlmClient::deepseek(api_key)?,
-            "google" => LlmClient::google(api_key)?,
-            "aliyun" => LlmClient::aliyun(api_key)?,
-            "zhipu" => LlmClient::zhipu(api_key)?,
-            // "tencent" => LlmClient::tencent("default_id", api_key)?, // Temporarily disabled due to API change
-            "volcengine" => LlmClient::volcengine(api_key)?,
-            "moonshot" => LlmClient::moonshot(api_key)?,
-            "xiaomi" => LlmClient::xiaomi(api_key)?,
-            "ollama" => LlmClient::ollama()?, // Ollama usually doesn't need key, but builder pattern preferred
-            _ => return Err(anyhow::anyhow!("Unsupported provider: {}", provider)),
+    /// Initialize the agent client with a specific configuration
+    pub fn new(config: &RoleConfig) -> Result<Self> {
+        let client = if let Some(base_url) = &config.base_url {
+            // If base_url is provided, assume OpenAI compatible protocol for most providers
+            // This allows connecting to any service that mimics OpenAI API (DeepSeek, LocalAI, etc.)
+            LlmClient::openai_with_base_url(&config.api_key, base_url)?
+        } else {
+            match config.provider.as_str() {
+                "openai" => LlmClient::openai(&config.api_key)?,
+                "anthropic" => LlmClient::anthropic(&config.api_key)?,
+                "deepseek" => LlmClient::deepseek(&config.api_key)?,
+                "google" => LlmClient::google(&config.api_key)?,
+                "aliyun" => LlmClient::aliyun(&config.api_key)?,
+                "zhipu" => LlmClient::zhipu(&config.api_key)?,
+                "volcengine" => LlmClient::volcengine(&config.api_key)?,
+                "moonshot" => LlmClient::moonshot(&config.api_key)?,
+                "xiaomi" => LlmClient::xiaomi(&config.api_key)?,
+                // "minimax" => LlmClient::minimax(&config.api_key)?, 
+                "ollama" => LlmClient::ollama()?,
+                _ => return Err(anyhow::anyhow!("Unsupported provider: {}", config.provider)),
+            }
         };
 
-        // Set default models based on provider
-        let model = match provider {
-            "openai" => "gpt-4".to_string(),
-            "anthropic" => "claude-3-opus-20240229".to_string(),
-            "deepseek" => "deepseek-coder".to_string(),
-            "google" => "gemini-pro".to_string(),
-            "aliyun" => "qwen-max".to_string(),
-            "zhipu" => "glm-4".to_string(),
-            "tencent" => "hunyuan".to_string(),
-            "volcengine" => "doubao-pro".to_string(),
-            "moonshot" => "moonshot-v1-32k".to_string(),
-            "xiaomi" => "yi-34b-chat".to_string(),
-            "ollama" => "llama3".to_string(),
-            _ => "gpt-4".to_string(),
-        };
-
-        Ok(Self { client, model })
+        Ok(Self {
+            client,
+            model: config.model.clone(),
+        })
     }
 
     #[allow(dead_code)]
@@ -56,7 +51,7 @@ impl AgentClient {
     pub async fn chat(&self, prompt: &str) -> Result<String> {
         let request = ChatRequest {
             model: self.model.clone(),
-            messages: vec![Message::text(Role::User, prompt)],
+            messages: vec![Message::text(llm_connector::types::Role::User, prompt)],
             ..Default::default()
         };
 
