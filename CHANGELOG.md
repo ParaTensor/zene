@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-02-16
+
+### ✨ Enhancements
+
+*   **Native Minimax Support**: Added explicit support for "minimax" provider with correct API endpoints.
+*   **Reflector Improvements**: Enhanced `Reflector` logic to better integrate with Executor and Planner, enabling a true "Self-Healing Loop".
+*   **Documentation**: Added social media content templates (Blog, X, Xiaohongshu) to `docs/` (excluded from git).
+
 ## [0.2.0] - 2026-02-16
 
 ### 🚀 Major Features
