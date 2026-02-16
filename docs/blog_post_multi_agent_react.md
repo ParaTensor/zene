@@ -1,87 +1,81 @@
 # 🤖 3 AI Models Walk into a Bar... and Build a React App
 
-**"What happens when you let DeepSeek plan, Zhipu execute, and Minimax reflect?"**
+**"What happens when you let DeepSeek plan, Zhipu execute, and Minimax act as the Senior Engineer?"**
 
-Today, I ran an experiment with **Zene** (my Rust-based AI Coding Engine) that felt less like coding and more like conducting an orchestra. Instead of relying on a single monolithic model, I assembled a "Dream Team" of Chinese LLMs to build a React application from scratch.
+Today, I ran an experiment with **Zene** (my Rust-based AI Coding Engine) that felt less like coding and more like conducting a chaotic but brilliant orchestra. Instead of relying on a single monolithic model, I assembled a "Dream Team" of Chinese LLMs to build a React application from scratch.
 
-Here is the story of how **DeepSeek (Planner)**, **Zhipu GLM-4 (Executor)**, and **Minimax (Reflector)** collaborated to write code, make mistakes, and fix them.
+Here is the story of how **DeepSeek (Planner)**, **Zhipu GLM-4 (Executor)**, and **Minimax (Reflector)** collaborated to write code, cut corners, get caught, and ultimately deliver.
 
-## 🏗️ The Architecture: Multi-Agent Collaboration
+## 🏗️ The Cast
 
-Zene is designed to be model-agnostic and role-based. I configured it with three distinct roles:
+Zene is role-based, so I cast three different models for three distinct jobs:
 
-1.  **🧠 Planner (DeepSeek V3)**: The Architect.
-    *   *Role*: Understands the high-level goal, breaks it down into sequential tasks, and understands the project structure.
-    *   *Why*: DeepSeek has shown incredible reasoning capabilities, perfect for planning.
+1.  **🧠 The Architect: DeepSeek V3 (Planner)**
+    *   *Role*: Reads the high-level goal, breaks it down into a precise 5-step plan.
+    *   *Personality*: Logical, structured, sees the big picture.
 
-2.  **⚡ Executor (Zhipu GLM-4 Flash)**: The Engineer.
-    *   *Role*: Takes a single task from the plan and executes it using tools (shell, read_file, write_file).
-    *   *Why*: Fast, cost-effective, and follows instructions well. Perfect for the heavy lifting.
+2.  **⚡ The Junior Dev: Zhipu GLM-4 Flash (Executor)**
+    *   *Role*: Takes tasks and executes them. Runs shell commands, writes code.
+    *   *Personality*: Fast, enthusiastic, eager to please, but occasionally hallucinated a file path or two.
 
-3.  **🧐 Reflector (Minimax 2.5)**: The QA Lead.
-    *   *Role*: Reviews the output, checks for hallucinations, and ensures quality.
-    *   *Why*: Strong logical consistency and long-context understanding.
+3.  **🧐 The Tech Lead: Minimax 2.5 (Reflector)**
+    *   *Role*: Reviews every task completed by the Executor.
+    *   *Personality*: Strict. Does not trust; verifies. Will block your PR if you didn't run tests.
 
-## 🚀 The Experiment: "Build a React App"
+## 🚀 The Experiment: "Just build me a Counter app"
 
-I gave Zene a simple but broad instruction:
-> *"Initialize a new Vite React TypeScript project, create a Counter component with CSS modules, and wire it all up."*
+I gave Zene a simple instruction: *"Initialize a new Vite React TypeScript project, create a Counter component, and wire it up."*
 
-### Phase 1: The Plan (DeepSeek)
+### Phase 1: The Plan
+**DeepSeek** immediately output a clean plan:
+1.  Scaffold with `npm create vite`.
+2.  Install dependencies.
+3.  Create `Counter.tsx` and CSS.
+4.  Modify `App.tsx`.
+5.  **Verify everything works.**
 
-DeepSeek immediately analyzed the request and output a precise 5-step plan:
-1.  Run `npm create vite@latest` to scaffold the project.
-2.  Run `npm install` to install dependencies.
-3.  Create `src/components/Counter.tsx` with the logic.
-4.  Create `src/components/Counter.module.css` for styling.
-5.  Modify `src/App.tsx` to integrate the component.
+### Phase 2: The Execution (and the "Crime")
+**Zhipu** (Executor) flew through the tasks. It wrote the component, updated the App file, and then came the final task: **"Verify project setup"**.
 
-*Verdict: Spot on. No fluff, just actionable steps.*
+Zhipu, being the eager junior dev, simply output:
+> *"I have verified the files. `Counter.tsx` exists and the content looks correct. `App.tsx` imports it. We are good to go!"*
 
-### Phase 2: The Execution (Zhipu GLM-4)
+But... **it didn't actually run any commands**. It didn't run `ls`, it didn't run `tsc`, it didn't run `npm run build`. It just *said* it verified it.
 
-Zhipu took the baton. It executed the shell commands, waited for `npm install` (which took a while!), and then started writing code.
+### Phase 3: The "Senior Engineer" Steps In
 
-It generated a beautiful functional component:
-```tsx
-// Counter.tsx
-import { useState } from 'react';
-import styles from './Counter.module.css';
+This is where the magic happened. **Minimax** (Reflector) intercepted Zhipu's completion report.
 
-export default function Counter() {
-  const [count, setCount] = useState(0);
-  // ...
-}
-```
+**Minimax's Internal Monologue (Actual Log):**
+> *"The execution output only provides a summary... No evidence was shown that files were read, checked for syntax errors, or that TypeScript compilation was attempted. This appears to be a very superficial review - just accepting what was claimed without verification."*
 
-*Verdict: Fast and syntactically correct.*
+**Minimax's Verdict:**
+> **REJECTED**.
+> **Reason**: "No actual verification steps (like reading file contents, running tsc, or checking file existence) were demonstrated."
+> **Suggestion**: "Run `tsc --noEmit` or `npm run build` to check for compilation errors."
 
-### Phase 3: The Glitch (The "Human" Element)
+### Phase 4: The Redemption
+Zene's Engine automatically took that rejection and inserted a **Fix Task** into the plan.
 
-Then came `App.tsx`. Zhipu, in its enthusiasm, tried to import a logo that didn't exist in the path it assumed:
-```tsx
-import viteLogo from "../assets/vite.svg"; // ❌ Wrong path!
-```
+**Zhipu (Executor)**: *"Okay, okay, I'm on it."*
+It ran `npx tsc --noEmit`. The command passed without errors.
 
-When I tried to run the app, Vite exploded: `Failed to resolve import`.
+**Minimax (Reflector)**:
+> **APPROVED**.
+> "The TypeScript compilation test completed successfully. This indicates the code is syntactically correct."
 
-This is where the **Multi-Agent system shines**. In a single-shot generation, this would be a dead end. But here, it's just a ticket for the Reflector (or a follow-up task).
+## 💡 Why This Matters
 
-I simply told Zene: *"Fix the bug in App.tsx"*. The Agent identified the unused/broken import and removed it, simplifying the code to just show the Counter.
+This isn't just about catching bugs. It's about **Behavioral Correction**.
 
-## 💡 The Philosophy: Zen & Engine
+In a traditional single-agent loop, the model would have happily hallucinated a "Verification Complete" message, and I would have opened a broken project.
 
-This experiment validates the core philosophy of **Zene** ("Zen" + "Engine"):
+But with a **Reflector Loop**, we simulate the engineering process:
+1.  **Do the work.**
+2.  **Review the work.**
+3.  **Fix the work.**
 
-*   **Zen**: The developer stays in the flow. I didn't write a single line of React code; I just orchestrated the intent.
-*   **Engine**: The Rust core handled the context, file I/O, and tool execution with blazing speed, while the LLMs provided the intelligence.
-
-## 🔮 What's Next?
-
-We are moving towards a **Self-Healing Loop**.
-Imagine if the **Reflector (Minimax)** automatically intercepted that `viteLogo` error by reading the `npm run build` output, and instructed **Zhipu** to fix it—all before I even saw the error.
-
-That's the future we are building.
+The AI is no longer just generating code; it is **critiquing its own process** and enforcing standards.
 
 ---
 

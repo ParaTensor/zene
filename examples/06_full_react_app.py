@@ -52,6 +52,8 @@ def read_response(proc):
             # Not a JSON line (maybe logs), print it
             print(f"[Server Log] {line.strip()}")
 
+import time
+
 def main():
     setup_workspace()
 
@@ -76,7 +78,9 @@ def main():
     )
 
     try:
-        session_id = "demo_full_react_001"
+        # Use a unique session ID to avoid loading cached state
+        session_id = f"demo_full_react_{int(time.time())}"
+        print(f"Session ID: {session_id}")
         
         # Task: Full Project Initialization
         # This requires:
