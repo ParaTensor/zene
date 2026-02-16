@@ -33,15 +33,20 @@ impl Plan {
         }
     }
 
-    pub fn next_task(&mut self) -> Option<&mut Task> {
-        // Find the first Pending task
-        for (i, task) in self.tasks.iter_mut().enumerate() {
-            if matches!(task.status, TaskStatus::Pending) {
-                self.current_task_index = Some(i);
-                task.status = TaskStatus::InProgress;
-                return Some(task);
-            }
-        }
-        None
-    }
+    // pub fn next_task(&mut self) -> Option<&mut Task> {
+    //     if let Some(idx) = self.current_task_index {
+    //         if idx < self.tasks.len() - 1 {
+    //             self.current_task_index = Some(idx + 1);
+    //             return Some(&mut self.tasks[idx + 1]);
+    //         }
+    //         return None;
+    //     } else {
+    //         // Start from first task
+    //         if !self.tasks.is_empty() {
+    //             self.current_task_index = Some(0);
+    //             return Some(&mut self.tasks[0]);
+    //         }
+    //         return None;
+    //     }
+    // }
 }
