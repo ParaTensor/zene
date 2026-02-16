@@ -16,15 +16,80 @@ impl ContextEngine {
         Ok(Self { parser })
     }
 
-    /// L1: Scan project structure
-    pub fn scan_project(&self, root: &Path) -> Vec<String> {
+    /// L1: Scan project structure (limited depth)
+    /// Only returns directories and files at the top level or within a limited depth
+    pub fn list_files(&self, root: &Path, depth: Option<usize>) -> Vec<String> {
         let mut files = Vec::new();
-        for entry in WalkBuilder::new(root).build().flatten() {
-            if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
-                files.push(entry.path().display().to_string());
+        let mut builder = WalkBuilder::new(root);
+        if let Some(d) = depth {
+            builder.max_depth(Some(d));
+        }
+        
+        for entry in builder.build().flatten() {
+            if entry.path() == root {
+                continue;
+            }
+            // Strip prefix for cleaner output
+            let path_str = if let Ok(stripped) = entry.path().strip_prefix(root) {
+                stripped.display().to_string()
+            } else {
+                entry.path().display().to_string()
+            };
+            
+            // Append "/" to directories for clarity
+            if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                files.push(format!("{}/", path_str));
+            } else {
+                files.push(path_str);
             }
         }
         files
+    }
+
+    /// Search for a pattern in the project (ripgrep-like)
+    pub fn search_code(&self, root: &Path, pattern: &str) -> Result<Vec<String>> {
+        use grep::regex::RegexMatcher;
+        use grep::searcher::Searcher;
+        use grep::searcher::sinks::UTF8;
+
+        let matcher = RegexMatcher::new(pattern)?;
+        let mut matches = Vec::new();
+
+        for result in WalkBuilder::new(root).build() {
+            let entry = match result {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+
+            if entry.file_type().map_or(true, |ft| !ft.is_file()) {
+                continue;
+            }
+
+            let path = entry.path();
+            let relative_path = path.strip_prefix(root).unwrap_or(path).display().to_string();
+
+            let _ = Searcher::new().search_path(
+                &matcher,
+                path,
+                UTF8(|lnum, line| {
+                    let match_str = format!("{}:{}: {}", relative_path, lnum, line.trim());
+                    matches.push(match_str);
+                    Ok(true)
+                }),
+            );
+
+            // Limit results to prevent context overflow
+            if matches.len() > 100 {
+                matches.push("... (too many matches, truncated)".to_string());
+                break;
+            }
+        }
+
+        if matches.is_empty() {
+            Ok(vec!["No matches found.".to_string()])
+        } else {
+            Ok(matches)
+        }
     }
 
     /// L2: Analyze file for definitions (Structs, Functions)

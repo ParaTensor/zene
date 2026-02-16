@@ -10,7 +10,9 @@ mod agent;
 mod engine;
 
 use agent::{AgentClient, AgentRunner};
+use engine::session::SessionManager;
 use engine::tools::ToolManager;
+use engine::ui::{AutoUserInterface, CliUserInterface, UserInterface};
 
 #[derive(Parser)]
 #[command(name = "zene")]
@@ -75,10 +77,12 @@ async fn main() -> anyhow::Result<()> {
     } else if let Some(Commands::Run { prompt }) = cli.command {
         info!("Running one-shot task: {}", prompt);
 
-        // Initialize Agent for one-shot
-        if let Some(runner) = setup_runner().await {
+        // Initialize Agent for one-shot (Use CLI Interface)
+        if let Some(runner) = setup_runner(true).await {
             let mut runner = runner;
-            match runner.run(&prompt).await {
+            // Create a temporary session for one-shot task
+            let mut session = engine::session::Session::new("cli-one-shot".to_string());
+            match runner.run(&prompt, &mut session).await {
                 Ok(result) => println!("{}", result),
                 Err(e) => error!("Task failed: {}", e),
             }
@@ -94,7 +98,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn setup_runner() -> Option<AgentRunner> {
+async fn setup_runner(use_cli_ui: bool) -> Option<AgentRunner> {
     // Try to get API Key from environment variables
     // Priority: DEEPSEEK_API_KEY > OPENAI_API_KEY
 
@@ -113,13 +117,20 @@ async fn setup_runner() -> Option<AgentRunner> {
     info!("Initializing agent with provider: {}", provider);
 
     match AgentClient::new(provider, &api_key) {
-        Ok(client) => match AgentRunner::new(client) {
-            Ok(runner) => Some(runner),
-            Err(e) => {
-                error!("Failed to create AgentRunner: {}", e);
-                None
+        Ok(client) => {
+            let ui: Box<dyn UserInterface> = if use_cli_ui {
+                Box::new(CliUserInterface::new())
+            } else {
+                Box::new(AutoUserInterface)
+            };
+            match AgentRunner::new(client, ui) {
+                Ok(runner) => Some(runner),
+                Err(e) => {
+                    error!("Failed to create AgentRunner: {}", e);
+                    None
+                }
             }
-        },
+        }
         Err(e) => {
             error!("Failed to create AgentClient: {}", e);
             None
@@ -128,7 +139,8 @@ async fn setup_runner() -> Option<AgentRunner> {
 }
 
 async fn run_server() -> anyhow::Result<()> {
-    let mut runner = setup_runner().await;
+    let mut runner = setup_runner(false).await;
+    let mut session_manager = SessionManager::new()?;
 
     let stdin = io::stdin();
     let mut reader = stdin.lock();
@@ -149,7 +161,7 @@ async fn run_server() -> anyhow::Result<()> {
         match serde_json::from_str::<JsonRpcRequest>(input) {
             Ok(req) => {
                 info!("Received request: {:?}", req.method);
-                let response = handle_request(req, &mut runner).await;
+                let response = handle_request(req, &mut runner, &mut session_manager).await;
                 let json = serde_json::to_string(&response)?;
                 println!("{}", json);
                 io::stdout().flush()?;
@@ -173,7 +185,11 @@ async fn run_server() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn handle_request(req: JsonRpcRequest, runner: &mut Option<AgentRunner>) -> JsonRpcResponse {
+async fn handle_request(
+    req: JsonRpcRequest,
+    runner: &mut Option<AgentRunner>,
+    session_manager: &mut SessionManager,
+) -> JsonRpcResponse {
     let result = match req.method.as_str() {
         "agent.run" => {
             if let Some(runner) = runner {
@@ -183,11 +199,27 @@ async fn handle_request(req: JsonRpcRequest, runner: &mut Option<AgentRunner>) -
                     .and_then(|v| v.as_str())
                     .unwrap_or("No instruction provided");
 
-                match runner.run(instruction).await {
-                    Ok(output) => serde_json::json!({
-                        "status": "completed",
-                        "message": output
-                    }),
+                let session_id = req
+                    .params
+                    .get("session_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "default".to_string());
+
+                let session = session_manager.create_session(session_id.clone());
+
+                match runner.run(instruction, session).await {
+                    Ok(output) => {
+                        // Auto-save session after run
+                        if let Err(e) = session_manager.save_session(session) {
+                            error!("Failed to save session: {}", e);
+                        }
+                        serde_json::json!({
+                            "status": "completed",
+                            "message": output,
+                            "session_id": session_id
+                        })
+                    }
                     Err(e) => serde_json::json!({
                         "status": "failed",
                         "error": e.to_string()

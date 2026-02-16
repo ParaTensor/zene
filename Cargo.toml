@@ -37,6 +37,8 @@ tree-sitter = "0.20"
 tree-sitter-rust = "0.20"
 tree-sitter-typescript = "0.20"
 ignore = "0.4" # For file walking respecting .gitignore
+grep = "0.2"   # For searching text patterns
+walkdir = "2.3" # For directory traversal (if needed, but ignore is better)
 
 # Optional: For future MCP or LSP implementation
 # tower-lsp = "0.20" 
