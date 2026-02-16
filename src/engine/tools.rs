@@ -1,3 +1,4 @@
+use crate::engine::context::ContextEngine;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -60,6 +61,28 @@ impl ToolManager {
                     "required": ["command"]
                 }),
             },
+            ToolDefinition {
+                name: "search_code".to_string(),
+                description: "Search for a pattern in the codebase using ripgrep".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "pattern": { "type": "string", "description": "The regex pattern to search for" }
+                    },
+                    "required": ["pattern"]
+                }),
+            },
+            ToolDefinition {
+                name: "list_files".to_string(),
+                description: "List files and directories".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "path": { "type": "string", "description": "Directory to list (defaults to current dir)" },
+                        "depth": { "type": "integer", "description": "Depth limit (optional)" }
+                    }
+                }),
+            },
         ]
     }
 
@@ -101,5 +124,23 @@ impl ToolManager {
                 stdout, stderr
             ))
         }
+    }
+
+    pub fn search_code(pattern: &str) -> Result<Vec<String>> {
+        let root = std::env::current_dir()?;
+        let engine = ContextEngine::new()?;
+        engine.search_code(&root, pattern)
+    }
+
+    pub fn list_files(path: Option<&str>, depth: Option<i64>) -> Result<Vec<String>> {
+        let root = std::env::current_dir()?;
+        let target_path = if let Some(p) = path {
+            root.join(p)
+        } else {
+            root
+        };
+        let depth = depth.map(|d| d as usize);
+        let engine = ContextEngine::new()?;
+        Ok(engine.list_files(&target_path, depth))
     }
 }

@@ -50,11 +50,41 @@ cargo run -- run "Fetch https://example.com and summarize it in README.md"
 ```
 
 ### 3. Server Mode
-Start Zene as a JSON-RPC server.
+Start Zene as a JSON-RPC server (over Stdio). This mode supports persistent sessions and multi-turn conversations.
 
 ```bash
 cargo run -- server
 ```
+
+#### JSON-RPC API Example
+
+**Request (Start Session):**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "agent.run",
+  "params": {
+    "instruction": "Analyze the project structure",
+    "session_id": "my-session-001"
+  },
+  "id": 1
+}
+```
+
+**Request (Follow-up):**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "agent.run",
+  "params": {
+    "instruction": "Based on that, generate a README",
+    "session_id": "my-session-001"
+  },
+  "id": 2
+}
+```
+
+Sessions are automatically persisted to `~/.zene/sessions/<session_id>.json`.
 
 ## 📚 Documentation
 
