@@ -206,14 +206,34 @@ async fn handle_request(
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| "default".to_string());
 
+                // Get session first (mutable borrow)
                 let session = session_manager.create_session(session_id.clone());
 
-                match runner.run(instruction, session).await {
+                // Run the task
+                let run_result = runner.run(instruction, session).await;
+                
+                // Clone needed data for saving and responding, to release the borrow
+                let session_clone = session.clone();
+                
+                match run_result {
                     Ok(output) => {
-                        // Auto-save session after run
-                        if let Err(e) = session_manager.save_session(session) {
+                        // Now we can use session_manager again because `session` borrow is ended (if we don't use `session` anymore)
+                        // Actually, to end the borrow, we must not use `session` after this point.
+                        // But `session` is still in scope?
+                        // Rust NLL (Non-Lexical Lifetimes) should handle this if we don't touch `session`.
+                        
+                        // However, `session_clone` is a clone of the data. We can pass THAT to save_session.
+                        // But wait, save_session is a method on SessionManager.
+                        // We need to call session_manager.save_session(&session_clone).
+                        // This requires &self (immutable borrow of manager) and &Session.
+                        
+                        // If we drop `session` (the mutable borrow of manager), we can borrow manager immutably.
+                        // Yes!
+                        
+                        if let Err(e) = session_manager.save_session(&session_clone) {
                             error!("Failed to save session: {}", e);
                         }
+                        
                         serde_json::json!({
                             "status": "completed",
                             "message": output,
