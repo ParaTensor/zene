@@ -1,8 +1,8 @@
 [package]
 name = "zene"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
-description = "A minimalist, high-performance coding engine."
+description = "A minimalist, high-performance multi-agent coding engine written in Rust."
 license = "MIT"
 repository = "https://github.com/lipish/zene"
 keywords = ["coding", "agent", "engine", "ai", "rust"]
