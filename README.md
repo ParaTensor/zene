@@ -4,7 +4,19 @@
 
 **Zene** is a headless AI coding agent designed to understand your codebase and execute complex programming tasks. It acts as an intelligent backend that can be integrated into CLI tools, IDEs, or other agentic workflows via standard JSON-RPC.
 
-## 🚀 Key Features
+## � Philosophy
+
+**Zene** combines **"Zen"** and **"Engine"**.
+
+*   **Zen**: Minimalist, focused, and distraction-free. We avoid bloated frameworks to provide a pure coding flow.
+*   **Engine**: High-performance, reliable, and powerful. Written in Rust to be the robust core driving your intelligent agents.
+
+We believe in:
+*   **Single Binary**: No complex runtime dependencies.
+*   **Explicit Configuration**: No magic, just standard environment variables.
+*   **Agentic Composition**: Specialized roles (Planner, Executor, Reflector) working in harmony.
+
+## �🚀 Key Features
 
 *   **Model Agnostic**: Built on `llm-connector`, supporting OpenAI, Anthropic, DeepSeek, Google Gemini, and more.
 *   **Context Aware**: Uses `tree-sitter` for syntax-level code analysis and efficient file walking to understand project structure.

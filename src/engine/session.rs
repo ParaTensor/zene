@@ -3,13 +3,15 @@ use llm_connector::types::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tracing::info;
+use crate::engine::plan::Plan;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Session {
     pub id: String,
     pub history: Vec<Message>,
+    pub plan: Option<Plan>, // Store the execution plan
     pub created_at: u64,
     pub last_updated_at: u64,
 }
@@ -23,6 +25,7 @@ impl Session {
         Self {
             id,
             history: Vec::new(),
+            plan: None,
             created_at: now,
             last_updated_at: now,
         }
@@ -49,12 +52,17 @@ impl SessionManager {
         };
 
         // Load existing sessions
-        manager.load_all()?;
+        if let Err(e) = manager.load_all() {
+             info!("Warning: Failed to load sessions: {}", e);
+        }
 
         Ok(manager)
     }
 
     fn load_all(&mut self) -> Result<()> {
+        if !self.storage_dir.exists() {
+             return Ok(());
+        }
         for entry in fs::read_dir(&self.storage_dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -69,6 +77,7 @@ impl SessionManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_session(&mut self, id: &str) -> Option<&mut Session> {
         self.sessions.get_mut(id)
     }
@@ -79,8 +88,9 @@ impl SessionManager {
         }
 
         let session = Session::new(id.clone());
-        self.save_session(&session).unwrap_or_else(|e| info!("Failed to save session: {}", e));
-        self.sessions.entry(id).or_insert(session)
+        // Don't auto-save on creation to avoid empty files, wait for first save
+        self.sessions.insert(id.clone(), session);
+        self.sessions.get_mut(&id).unwrap()
     }
 
     pub fn save_session(&self, session: &Session) -> Result<()> {

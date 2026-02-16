@@ -1,15 +1,16 @@
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::io::{self, BufRead, Write};
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 // Internal modules
 mod agent;
 mod engine;
+mod config;
 
-use agent::{AgentClient, AgentRunner};
+use agent::AgentRunner;
+use config::AgentConfig;
 use engine::session::SessionManager;
 use engine::tools::ToolManager;
 use engine::ui::{AutoUserInterface, CliUserInterface, UserInterface};
@@ -99,31 +100,18 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn setup_runner(use_cli_ui: bool) -> Option<AgentRunner> {
-    // Try to get API Key from environment variables
-    // Priority: DEEPSEEK_API_KEY > OPENAI_API_KEY
-
-    let deepseek_key = env::var("DEEPSEEK_API_KEY").ok();
-    let openai_key = env::var("OPENAI_API_KEY").ok();
-
-    let (provider, api_key) = if let Some(k) = deepseek_key {
-        ("deepseek", k)
-    } else if let Some(k) = openai_key {
-        ("openai", k)
-    } else {
-        warn!("No supported API key found (DEEPSEEK_API_KEY or OPENAI_API_KEY). Agent capabilities will be disabled.");
-        return None;
-    };
-
-    info!("Initializing agent with provider: {}", provider);
-
-    match AgentClient::new(provider, &api_key) {
-        Ok(client) => {
+    // Load configuration from environment variables
+    match AgentConfig::from_env() {
+        Ok(config) => {
+            info!("Loaded agent configuration: {:?}", config);
+            
             let ui: Box<dyn UserInterface> = if use_cli_ui {
                 Box::new(CliUserInterface::new())
             } else {
                 Box::new(AutoUserInterface)
             };
-            match AgentRunner::new(client, ui) {
+
+            match AgentRunner::new(config, ui) {
                 Ok(runner) => Some(runner),
                 Err(e) => {
                     error!("Failed to create AgentRunner: {}", e);
@@ -132,7 +120,7 @@ async fn setup_runner(use_cli_ui: bool) -> Option<AgentRunner> {
             }
         }
         Err(e) => {
-            error!("Failed to create AgentClient: {}", e);
+            error!("Failed to load configuration: {}", e);
             None
         }
     }
