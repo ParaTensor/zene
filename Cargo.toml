@@ -1,12 +1,21 @@
 [package]
 name = "zene"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "A minimalist, high-performance multi-agent coding engine written in Rust."
 license = "MIT"
 repository = "https://github.com/lipish/zene"
 keywords = ["coding", "agent", "engine", "ai", "rust"]
 categories = ["command-line-utilities", "development-tools"]
+exclude = [
+    "www",
+    ".fastembed_cache",
+    "temp_workspace",
+    "examples",
+    "docs",
+    ".github",
+    ".vscode"
+]
 
 [dependencies]
 # Runtime & Async
@@ -41,6 +50,9 @@ grep = "0.2"   # For searching text patterns
 walkdir = "2.3" # For directory traversal (if needed, but ignore is better)
 zene-mcp = "0.1.0"
 toml = "1.0.2"
+fastembed = "5.9.0"
+usearch = "2.24.0"
+md5 = "0.8.0"
 
 # Optional: For future MCP or LSP implementation
 # tower-lsp = "0.20" 

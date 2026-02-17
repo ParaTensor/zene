@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use crate::engine::tools::ToolManager;
 use crate::engine::ui::UserInterface;
+use crate::engine::context::ContextEngine;
 
 pub struct ToolHandler;
 
@@ -11,6 +12,7 @@ impl ToolHandler {
         args: &serde_json::Value,
         args_str: &str,
         env_vars: &mut HashMap<String, String>,
+        context_engine: &mut ContextEngine,
     ) -> String {
         // Confirmation check for sensitive tools
         if (tool_name == "run_command" || tool_name == "write_file" || tool_name == "apply_patch")
@@ -132,6 +134,35 @@ impl ToolHandler {
                     }
                 } else {
                     "Error: Missing arguments (path, original_snippet, new_snippet)".to_string()
+                }
+            }
+            "memory_search" => {
+                if let Some(query) = args.get("query").and_then(|v| v.as_str()) {
+                    if let Some(memory) = &mut context_engine.memory {
+                        match memory.search(query, 5) {
+                            Ok(results) => {
+                                if results.is_empty() {
+                                    "No relevant results found in memory.".to_string()
+                                } else {
+                                    results.iter().map(|(doc, dist)| {
+                                        format!("- [Score: {:.2}] {}:\n{}", 1.0 - dist, doc.path, doc.content.lines().take(3).collect::<Vec<_>>().join("\n"))
+                                    }).collect::<Vec<_>>().join("\n\n")
+                                }
+                            }
+                            Err(e) => format!("Error searching memory: {}", e),
+                        }
+                    } else {
+                         "Error: Memory engine not initialized.".to_string()
+                    }
+                } else {
+                    "Error: Missing query argument".to_string()
+                }
+            }
+            "memory_index" => {
+                let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+                match context_engine.index_project(&root) {
+                    Ok(msg) => msg,
+                    Err(e) => format!("Error indexing project: {}", e),
                 }
             }
             _ => format!("Error: Unknown tool {}", tool_name),

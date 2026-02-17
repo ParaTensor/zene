@@ -1,11 +1,13 @@
 use anyhow::Result;
 use ignore::WalkBuilder;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tree_sitter::{Parser, Query, QueryCursor};
+use crate::engine::memory::MemoryManager;
 
 pub struct ContextEngine {
     #[allow(dead_code)]
     parser: Parser,
+    pub memory: Option<MemoryManager>,
 }
 
 impl ContextEngine {
@@ -13,7 +15,17 @@ impl ContextEngine {
         let mut parser = Parser::new();
         // Default to Rust for now, in reality we'd swap languages dynamically
         parser.set_language(tree_sitter_rust::language())?;
-        Ok(Self { parser })
+        
+        let root = std::env::current_dir()?;
+        let memory = match MemoryManager::new(&root) {
+            Ok(m) => Some(m),
+            Err(e) => {
+                tracing::warn!("Failed to initialize MemoryManager: {}", e);
+                None
+            }
+        };
+
+        Ok(Self { parser, memory })
     }
 
     /// L1: Scan project structure (limited depth)
@@ -115,5 +127,14 @@ impl ContextEngine {
         }
 
         Ok(definitions)
+
+    }
+
+    pub fn index_project(&mut self, root: &Path) -> Result<String> {
+        if let Some(memory) = &mut self.memory {
+            memory.index_project(root)
+        } else {
+             Err(anyhow::anyhow!("Memory engine not initialized"))
+        }
     }
 }

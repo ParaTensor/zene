@@ -5,16 +5,18 @@ use std::io::{self, BufRead, Write};
 use tracing::{error, info};
 
 // Internal modules
-mod agent;
-mod engine;
-mod config;
+// Internal modules
+// mod agent; // Removed: Use library
+// mod engine; // Removed: Use library
+// mod config; // Removed: Use library
 
-use agent::AgentRunner;
-use config::AgentConfig;
-use engine::session::SessionManager;
-use engine::tools::{ToolManager, MCP_MANAGER};
-use engine::ui::{AutoUserInterface, CliUserInterface, UserInterface};
-use engine::mcp::manager::McpManager;
+use zene::agent::runner::AgentRunner;
+use zene::config::AgentConfig;
+use zene::engine::session::SessionManager;
+use zene::engine::tools::{ToolManager, MCP_MANAGER};
+use zene::engine::ui::{AutoUserInterface, CliUserInterface, UserInterface};
+use zene::engine::mcp::manager::McpManager;
+use zene::engine::session::Session;
 
 #[derive(Parser)]
 #[command(name = "zene")]
@@ -100,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
         if let Some(runner) = setup_runner(true).await {
             let mut runner = runner;
             // Create a temporary session for one-shot task
-            let mut session = engine::session::Session::new("cli-one-shot".to_string());
+            let mut session = Session::new("cli-one-shot".to_string());
             match runner.run(&prompt, &mut session).await {
                 Ok(result) => println!("{}", result),
                 Err(e) => error!("Task failed: {}", e),
