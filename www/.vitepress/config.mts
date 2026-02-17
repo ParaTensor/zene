@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "Zene",
   description: "A self-healing, multi-agent coding engine written in Rust.",
-  
+
   appearance: 'dark', // Force dark mode for that hacker aesthetic
 
   head: [
@@ -21,15 +21,17 @@ export default defineConfig({
   themeConfig: {
     logo: '/logo.svg', // Placeholder, you can add an image later
     siteTitle: 'Zene',
-    
+
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Blog', link: '/blog/' },
       { text: 'Examples', link: '/examples/' },
-      { text: 'v0.2.2', items: [
-        { text: 'Changelog', link: 'https://github.com/lipish/zene/blob/main/CHANGELOG.md' },
-        { text: 'Contributing', link: 'https://github.com/lipish/zene/blob/main/CONTRIBUTING.md' }
-      ]}
+      {
+        text: 'v0.2.2', items: [
+          { text: 'Changelog', link: 'https://github.com/lipish/zene/blob/main/CHANGELOG.md' },
+          { text: 'Contributing', link: 'https://github.com/lipish/zene/blob/main/CONTRIBUTING.md' }
+        ]
+      }
     ],
 
     sidebar: {
@@ -45,9 +47,9 @@ export default defineConfig({
         {
           text: 'Core Concepts',
           items: [
-            { text: 'Planner (DeepSeek)', link: '/guide/planner' },
-            { text: 'Executor (Zhipu)', link: '/guide/executor' },
-            { text: 'Reflector (Minimax)', link: '/guide/reflector' }
+            { text: 'Planner', link: '/guide/planner' },
+            { text: 'Executor', link: '/guide/executor' },
+            { text: 'Reflector', link: '/guide/reflector' }
           ]
         },
         {
@@ -77,7 +79,7 @@ export default defineConfig({
       message: 'Released under the MIT License.',
       copyright: 'Copyright © 2026 Zene Contributors'
     },
-    
+
     search: {
       provider: 'local'
     }

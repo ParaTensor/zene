@@ -1,6 +1,6 @@
 # The Planner
 
-The **Planner** is the strategic brain of Zene. It uses **DeepSeek** (or configured LLM) to analyze the user's request and the codebase context to generate a structured execution plan.
+The **Planner** is the strategic brain of Zene. It uses a **Configured LLM** (e.g., DeepSeek, OpenAI) to analyze the user's request and the codebase context to generate a structured execution plan.
 
 ## Responsibilities
 

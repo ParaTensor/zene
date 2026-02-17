@@ -14,13 +14,13 @@ hero:
       link: https://github.com/lipish/zene
 
 features:
-  - title: Planner (DeepSeek)
+  - title: Planner
     details: Breaks down complex tasks into structured JSON execution plans. Zero hallucination architecture.
     icon: 🧠
-  - title: Executor (Zhipu)
+  - title: Executor
     details: High-performance Rust runtime for shell execution and file manipulation.
     icon: ⚡
-  - title: Reflector (Minimax)
+  - title: Reflector
     details: Automated code review and error correction loop. Verifies logic before commit.
     icon: 🛡️
   - title: Extensibility (MCP)
