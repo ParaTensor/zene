@@ -1,4 +1,4 @@
-.venv/
+.venv*
 /temp_workspace
 docs/Zene_Architecture_Overview.md
 docs/agent_module.md
