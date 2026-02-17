@@ -4,6 +4,10 @@ Thoughts, experiments, and case studies on AI coding agents.
 
 ## Case Studies
 
+### [Verifying Zene's Isolated Python Execution Environment](/blog/python-env-verification)
+_2026-02-17_
+We verified Zene's new V3 Python Execution Engine, confirming session-scoped isolation and automatic virtual environment management using Rust.
+
 ### [Automating Data Analysis with Zene](/blog/data-analysis)
 _2026-02-17_
 Data cleaning is 80% of the job. Watch Zene handle missing values, invalid dates, and chart generation autonomously.
