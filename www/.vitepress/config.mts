@@ -7,7 +7,7 @@ export default defineConfig({
   appearance: 'dark', // Force dark mode for that hacker aesthetic
 
   head: [
-    ['link', { rel: 'icon', href: '/favicon.ico' }],
+    ['link', { rel: 'icon', href: '/favicon.png' }],
     // Preload JetBrains Mono
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
@@ -19,7 +19,7 @@ export default defineConfig({
   ],
 
   themeConfig: {
-    logo: '/logo.svg', // Placeholder, you can add an image later
+    logo: '/logo.png',
     siteTitle: 'Zene',
 
     nav: [
