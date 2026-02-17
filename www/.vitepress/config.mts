@@ -4,8 +4,14 @@ export default defineConfig({
   title: "Zene",
   description: "A self-healing, multi-agent coding engine written in Rust.",
   
+  appearance: 'dark', // Force dark mode for that hacker aesthetic
+
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico' }],
+    // Preload JetBrains Mono
+    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
+    ['link', { href: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap', rel: 'stylesheet' }],
     // Meta tags for SEO and social sharing
     ['meta', { property: 'og:title', content: 'Zene - The Self-Healing AI Coding Agent' }],
     ['meta', { property: 'og:description', content: 'Plan, Execute, Reflect. An autonomous coding engine that verifies its own work.' }],

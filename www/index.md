@@ -2,9 +2,9 @@
 layout: home
 
 hero:
-  name: "Zene"
-  text: "The Self-Healing AI Engine"
-  tagline: "Plan. Execute. Reflect. An autonomous coding agent that writes, runs, and verifies code using Rust."
+  name: "$ zene start"
+  text: "Self-Healing AI Agent"
+  tagline: "Build. Break. Fix. Repeat. <br/> A Rust-powered autonomous coding engine."
   actions:
     - theme: brand
       text: Get Started
@@ -14,43 +14,87 @@ hero:
       link: https://github.com/lipish/zene
 
 features:
-  - title: Plan (DeepSeek)
-    details: Breaks down complex tasks into a structured, actionable plan. No hallucinations, just pure logic.
+  - title: Planner (DeepSeek)
+    details: Breaks down complex tasks into structured JSON execution plans. Zero hallucination architecture.
     icon: 🧠
-  - title: Execute (Zhipu)
-    details: Runs shell commands, edits files, and interacts with the OS. The hands that do the work.
+  - title: Executor (Zhipu)
+    details: High-performance Rust runtime for shell execution and file manipulation.
     icon: ⚡
-  - title: Reflect (Minimax)
-    details: Reviews the output. Catches errors. Rejects bad code. The "Senior Engineer" that ensures quality.
-    icon: 🧐
+  - title: Reflector (Minimax)
+    details: Automated code review and error correction loop. Verifies logic before commit.
+    icon: 🛡️
 ---
 
-# Why Zene?
+<div class="terminal-demo">
+  <div class="terminal-header">
+    <span class="dot red"></span>
+    <span class="dot yellow"></span>
+    <span class="dot green"></span>
+  </div>
+  <div class="terminal-body">
+    <div class="line"><span class="prompt">$</span> zene run "Fix the bug in src/main.rs"</div>
+    <div class="line text-dim">Analyzing codebase...</div>
+    <div class="line text-info">ℹ Planner: Identified syntax error on line 42</div>
+    <div class="line text-success">✔ Executor: Applied fix</div>
+    <div class="line text-warning">⚠ Reflector: Compilation failed. Retrying...</div>
+    <div class="line text-success">✔ Executor: Adjusted lifetime parameters</div>
+    <div class="line text-success">✔ Reflector: All tests passed.</div>
+    <div class="line"><span class="prompt">$</span> <span class="cursor">_</span></div>
+  </div>
+</div>
 
-Traditional AI coding assistants are "fire and forget". They give you code, and you hope it works.
+<style>
+.terminal-demo {
+  background: #1e1e1e;
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  margin: 40px auto;
+  max-width: 800px;
+  font-family: 'JetBrains Mono', monospace;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+.terminal-header {
+  background: #2d2d2d;
+  padding: 10px;
+  display: flex;
+  gap: 8px;
+}
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.red { background: #ff5f56; }
+.yellow { background: #ffbd2e; }
+.green { background: #27c93f; }
+.terminal-body {
+  padding: 20px;
+  color: #f8f8f2;
+}
+.line { margin-bottom: 8px; }
+.prompt { color: #ff79c6; margin-right: 8px; }
+.text-dim { color: #6272a4; }
+.text-info { color: #8be9fd; }
+.text-success { color: #50fa7b; }
+.text-warning { color: #ffb86c; }
+.cursor { animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+</style>
 
-**Zene is different.**
+# The Loop
 
-It implements a **Plan-Execute-Reflect** loop. It doesn't just guess; it **verifies**.
-- If the code doesn't compile, it fixes it.
-- If the tests fail, it rewrites them.
-- If the logic is flawed, it reflects and corrects.
+**Zene** is not just another copilot. It's an autonomous loop that **guarantees** code quality through self-reflection.
 
-Built with **Rust** for blazing speed and memory safety.
+1.  **Plan**: Generates a DAG of tasks.
+2.  **Execute**: Runs real commands in your shell.
+3.  **Reflect**: Analyzes stdout/stderr and file changes.
 
-## Quick Start
+## Installation
 
 ```bash
-# Install Zene
 cargo install zene
+```
 
-# Set up your keys
-export ZENE_PLANNER_API_KEY="..."
-export ZENE_EXECUTOR_API_KEY="..."
-export ZENE_REFLECTOR_API_KEY="..."
-
-# Run it
-zene run "Build a React app with a Counter component"
+```bash
+# Verify installation
+zene --version
 ```
 
 [Read the Documentation →](/guide/getting-started)
