@@ -62,8 +62,14 @@ export default defineConfig({
       ],
       '/blog/': [
         {
-          text: 'Blog',
+          text: 'Case Studies',
           items: [
+            { text: 'Python Env Verification', link: '/blog/python-env-verification' },
+            { text: 'Data Analysis', link: '/blog/data-analysis' },
+            { text: 'Multi-File API', link: '/blog/multi-file-api' },
+            { text: 'Dockerization', link: '/blog/dockerization' },
+            { text: 'Unit Testing', link: '/blog/unit-testing' },
+            { text: 'Web Scraping', link: '/blog/web-scraping' },
             { text: 'The Self-Healing Compiler', link: '/blog/self-healing-compiler' },
             { text: 'Refactoring Legacy Code', link: '/blog/refactoring-legacy' }
           ]
