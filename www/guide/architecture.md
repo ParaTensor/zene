@@ -5,15 +5,15 @@ Zene is designed around a **Plan-Execute-Reflect** loop, inspired by autonomous 
 ## Core Components
 
 ### 1. The Engine (Rust)
-The core runtime. Handles I/O, file system operations, and JSON-RPC communication. It is stateless and extremely fast.
+The core runtime. It is built on an **Orchestrator** pattern that manages the lifecycle of the agent. It integrates the **Context Engine** for memory management and handles I/O operations safely.
 
-### 2. The Planner (DeepSeek V3)
+### 2. The Planner
 Responsible for breaking down high-level user instructions into a sequence of atomic tasks.
 
-### 3. The Executor (Zhipu GLM-4)
+### 3. The Executor
 Responsible for executing individual tasks (e.g., "Edit file X", "Run command Y"). It has access to tools like `read_file`, `write_file`, `run_command`.
 
-### 4. The Reflector (Minimax)
+### 4. The Reflector
 The quality assurance layer. It reviews the output of the Executor and decides whether the task was completed successfully. If not, it rejects the task and provides feedback.
 
 ## Data Flow

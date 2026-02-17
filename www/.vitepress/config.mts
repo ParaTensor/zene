@@ -27,7 +27,7 @@ export default defineConfig({
       { text: 'Blog', link: '/blog/' },
       { text: 'Examples', link: '/examples/' },
       {
-        text: 'v0.3.0', items: [
+        text: 'v0.3.1', items: [
           { text: 'Changelog', link: 'https://github.com/lipish/zene/blob/main/CHANGELOG.md' },
           { text: 'Contributing', link: 'https://github.com/lipish/zene/blob/main/CONTRIBUTING.md' }
         ]
@@ -50,13 +50,15 @@ export default defineConfig({
             { text: 'Planner', link: '/guide/planner' },
             { text: 'Executor', link: '/guide/executor' },
             { text: 'Reflector', link: '/guide/reflector' },
+            { text: 'Context Memory', link: '/guide/memory' },
             { text: 'Simple Mode', link: '/guide/simple-mode' }
           ]
         },
         {
-          text: 'Extensibility',
+          text: 'Deep Dive',
           items: [
-            { text: 'MCP Integration', link: '/guide/mcp' }
+            { text: 'MCP Integration', link: '/guide/mcp' },
+            { text: 'Testing & Architecture', link: '/guide/testing' }
           ]
         }
       ],
