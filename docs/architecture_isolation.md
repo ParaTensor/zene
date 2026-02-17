@@ -47,9 +47,16 @@ Zene will treat the current working directory as a Project.
 2.  **Creation**: If missing, auto-run `python -m venv .venv`.
 3.  **Execution**: All Python scripts will be executed via `.venv/bin/python`, ensuring isolation from the host system.
 
-### Dependency Intelligence
-*   **Auto-Install**: Before execution, check `requirements.txt`.
-*   **Smart Caching**: Hash `requirements.txt` to avoid redundant `pip install` runs, significantly speeding up iteration cycles.
+### Multi-User Concurrency & Shared Resources
+**Important Note**: Currently, Zene defaults to a **Project-Level Virtual Environment** (`.venv`). This means all sessions operating in the same directory share the same Python environment and dependencies.
+*   **Pros**: Efficient disk usage; reuses installed packages across sessions.
+*   **Cons**: Potential dependency conflicts if multiple users concurrently modify `requirements.txt` with incompatible versions.
+
+**Future Optimization (Session-Specific Venv)**:
+To support high-concurrency multi-user scenarios (e.g., SaaS deployment), we will introduce **Session-Specific Environments**:
+*   Instead of `.venv`, use `.venv_{session_id}`.
+*   This ensures total isolation but at the cost of higher disk usage and setup time.
+*   The `.gitignore` should be updated to ignore `.venv*` to cover these dynamic directories.
 
 ## 4. Implementation Roadmap
 
