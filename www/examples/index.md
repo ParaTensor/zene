@@ -11,7 +11,9 @@ See Zene in action with these real-world scenarios.
 [Read the Blog Post](/blog/self-healing-compiler)
 
 ## 3. Data Analysis
-**Scenario**: Cleaning a CSV dataset and generating matplotlib charts. (Coming Soon)
+**Scenario**: Cleaning a CSV dataset and generating matplotlib charts. Zene handles missing values, invalid formats, and data visualization.
+[Read the Blog Post](/blog/data-analysis)
 
 ## 4. Multi-File API
-**Scenario**: Building a FastAPI backend with SQLite integration. (Coming Soon)
+**Scenario**: Building a production-ready FastAPI backend with SQLite integration. Zene generates a modular project structure with models, schemas, and CRUD logic.
+[Read the Blog Post](/blog/multi-file-api)
