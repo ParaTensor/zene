@@ -209,8 +209,8 @@ impl AgentRunner {
         
         // Let's implement `execute_adhoc` which is similar to the old loop
         
-        // Convert ToolDefinitions to llm_connector Tools
-        let tools: Vec<Tool> = ToolManager::list_tools()
+        // Convert ToolDefinitions to llm_connector Tools (Async)
+        let tools: Vec<Tool> = ToolManager::list_tools().await
             .into_iter()
             .map(|def| Tool::function(def.name, Some(def.description), def.input_schema))
             .collect();
@@ -292,7 +292,7 @@ impl AgentRunner {
         );
         history.push(Message::user(&task_prompt));
 
-        let tools: Vec<Tool> = ToolManager::list_tools()
+        let tools: Vec<Tool> = ToolManager::list_tools().await
             .into_iter()
             .map(|def| Tool::function(def.name, Some(def.description), def.input_schema))
             .collect();

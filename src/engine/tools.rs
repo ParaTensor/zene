@@ -1,8 +1,10 @@
 use crate::engine::context::ContextEngine;
 use crate::engine::python_env::PythonEnv;
+use crate::engine::mcp::manager::McpManager;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use std::fs;
 use std::path::Path;
 use std::process::Stdio;
@@ -18,9 +20,12 @@ pub struct ToolDefinition {
 
 pub struct ToolManager;
 
+// Global static instance for MCP Manager (MVP solution to avoid dependency injection refactor)
+pub static MCP_MANAGER: OnceLock<McpManager> = OnceLock::new();
+
 impl ToolManager {
-    pub fn list_tools() -> Vec<ToolDefinition> {
-        vec![
+    pub async fn list_tools() -> Vec<ToolDefinition> {
+        let mut tools = vec![
             ToolDefinition {
                 name: "read_file".to_string(),
                 description: "Read the complete contents of a file".to_string(),
@@ -137,7 +142,16 @@ impl ToolManager {
                     "required": ["script_path"]
                 }),
             },
-        ]
+        ];
+
+        // Append MCP tools dynamically
+        if let Some(manager) = MCP_MANAGER.get() {
+            // Explicitly await the future with type annotation
+            let mcp_tools: Vec<ToolDefinition> = manager.list_tools().await;
+            tools.extend(mcp_tools);
+        }
+
+        tools
     }
 
     pub fn read_file(path: &str) -> Result<String> {
