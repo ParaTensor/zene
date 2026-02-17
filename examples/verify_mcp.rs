@@ -1,7 +1,6 @@
 use zene::engine::tools::ToolManager;
 use zene::config::AgentConfig;
 use zene::engine::mcp::manager::McpManager;
-use zene::engine::tools::MCP_MANAGER;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -20,18 +19,18 @@ async fn main() -> anyhow::Result<()> {
     info!("Config loaded. MCP Servers defined: {:?}", config.mcp.servers.keys());
 
     // 2. Initialize Manager
-    let mcp_manager = McpManager::new(config.mcp);
+    let mcp_manager = std::sync::Arc::new(McpManager::new(config.mcp));
     
     // 3. Connect
     info!("Connecting to servers...");
     mcp_manager.connect_all().await;
     
-    // 4. Set Global (Simulate main.rs)
-    let _ = MCP_MANAGER.set(mcp_manager);
+    // 4. Initialize ToolManager with injected McpManager
+    let tool_manager = ToolManager::new(Some(mcp_manager));
 
     // 5. List Tools
     info!("Listing tools...");
-    let tools = ToolManager::list_tools().await;
+    let tools = tool_manager.list_tools().await;
     
     for tool in &tools {
         println!("- Tool: {} ({})", tool.name, tool.description);

@@ -3,6 +3,9 @@ use zene::agent::runner::AgentRunner;
 use zene::config::AgentConfig;
 use zene::engine::ui::UserInterface;
 use zene::engine::session::SessionManager;
+use zene::engine::session::store::FileSessionStore;
+use std::sync::Arc;
+use std::path::PathBuf;
 use tracing_subscriber;
 
 struct MockUI;
@@ -32,9 +35,17 @@ async fn main() -> Result<()> {
     });
     
     let ui = Box::new(MockUI);
-    let mut runner = AgentRunner::new(config.clone(), ui)?;
-    let mut session_manager = SessionManager::new()?;
-    let mut session = session_manager.create_session("p3_test_user".to_string());
+    
+    // Setup dependency injection
+    let mcp_manager = std::sync::Arc::new(zene::engine::mcp::manager::McpManager::new(config.mcp.clone()));
+    let tool_manager = std::sync::Arc::new(zene::engine::tools::ToolManager::new(Some(mcp_manager)));
+    
+    let mut runner = AgentRunner::new(config.clone(), tool_manager, ui)?;
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let storage_dir = PathBuf::from(&home).join(".zene/sessions");
+    let store = Arc::new(FileSessionStore::new(storage_dir)?);
+    let mut session_manager = SessionManager::new(store).await?;
+    let session = session_manager.create_session("p3_test_user".to_string());
 
     println!("Running AgentRunner with simple task...");
     

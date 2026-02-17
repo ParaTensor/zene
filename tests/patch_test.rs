@@ -20,7 +20,8 @@ fn test_patch_exact_match() -> Result<()> {
     let original = "line2\nline3";
     let new = "line2_modified\nline3_modified";
 
-    ToolManager::apply_patch(path.to_str().unwrap(), original, new, None)?;
+    let tm = ToolManager::new(None);
+    tm.apply_patch(path.to_str().unwrap(), original, new, None)?;
 
     let result = fs::read_to_string(path)?;
     assert_eq!(result, "line1\nline2_modified\nline3_modified\nline4");
@@ -38,7 +39,8 @@ fn test_patch_fuzzy_whitespace() -> Result<()> {
     let original = "  let a = 1;\n  let b = 2;";
     let new = "    let a = 10;\n    let b = 20;";
 
-    ToolManager::apply_patch(path.to_str().unwrap(), original, new, None)?;
+    let tm = ToolManager::new(None);
+    tm.apply_patch(path.to_str().unwrap(), original, new, None)?;
 
     let result = fs::read_to_string(path)?;
     // The indentation of the new block should be preserved as provided in `new`
@@ -59,7 +61,8 @@ fn test_patch_start_line_hint() -> Result<()> {
     let new = "start_2\nend_2";
     
     // Hint: it's around line 6
-    ToolManager::apply_patch(path.to_str().unwrap(), original, new, Some(6))?;
+    let tm = ToolManager::new(None);
+    tm.apply_patch(path.to_str().unwrap(), original, new, Some(6))?;
 
     let result = fs::read_to_string(path)?;
     assert_eq!(result, "block1\nstart\nend\n\nblock2\nstart_2\nend_2");
@@ -75,6 +78,7 @@ fn test_patch_failure_not_found() {
     let original = "line3"; // Does not exist
     let new = "line3_new";
 
-    let result = ToolManager::apply_patch(path.to_str().unwrap(), original, new, None);
+    let tm = ToolManager::new(None);
+    let result = tm.apply_patch(path.to_str().unwrap(), original, new, None);
     assert!(result.is_err());
 }

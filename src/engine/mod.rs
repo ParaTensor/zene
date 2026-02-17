@@ -6,3 +6,4 @@ pub mod plan;
 pub mod python_env;
 pub mod mcp;
 pub mod memory;
+pub mod contracts;

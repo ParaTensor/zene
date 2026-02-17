@@ -82,3 +82,26 @@ impl AgentConfig {
         }
     }
 }
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            planner: RoleConfig::default(),
+            executor: RoleConfig::default(),
+            reflector: RoleConfig::default(),
+            mcp: McpConfig::default(),
+            simple_mode: false,
+        }
+    }
+}
+
+impl Default for RoleConfig {
+    fn default() -> Self {
+        Self {
+            provider: "openai".to_string(),
+            model: "gpt-4".to_string(),
+            api_key: "".to_string(),
+            base_url: None,
+        }
+    }
+}

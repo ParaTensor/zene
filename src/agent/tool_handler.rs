@@ -7,6 +7,7 @@ pub struct ToolHandler;
 
 impl ToolHandler {
     pub async fn execute(
+        tool_manager: &ToolManager,
         user_interface: &dyn UserInterface,
         tool_name: &str,
         args: &serde_json::Value,
@@ -24,7 +25,7 @@ impl ToolHandler {
         match tool_name {
             "read_file" => {
                 if let Some(path) = args.get("path").and_then(|v| v.as_str()) {
-                    match ToolManager::read_file(path) {
+                    match tool_manager.read_file(path) {
                         Ok(content) => content,
                         Err(e) => format!("Error reading file: {}", e),
                     }
@@ -36,7 +37,7 @@ impl ToolHandler {
                 let path = args.get("path").and_then(|v| v.as_str());
                 let content = args.get("content").and_then(|v| v.as_str());
                 if let (Some(p), Some(c)) = (path, content) {
-                    match ToolManager::write_file(p, c) {
+                    match tool_manager.write_file(p, c) {
                         Ok(_) => "File written successfully".to_string(),
                         Err(e) => format!("Error writing file: {}", e),
                     }
@@ -46,7 +47,7 @@ impl ToolHandler {
             }
             "fetch_url" => {
                 if let Some(url) = args.get("url").and_then(|v| v.as_str()) {
-                    match ToolManager::fetch_url(url).await {
+                    match tool_manager.fetch_url(url).await {
                         Ok(content) => content,
                         Err(e) => format!("Error fetching URL: {}", e),
                     }
@@ -56,7 +57,7 @@ impl ToolHandler {
             }
             "run_command" => {
                 if let Some(cmd) = args.get("command").and_then(|v| v.as_str()) {
-                    match ToolManager::run_command(cmd, env_vars).await {
+                    match tool_manager.run_command(cmd, env_vars).await {
                         Ok(output) => output,
                         Err(e) => format!("Error running command: {}", e),
                     }
@@ -71,7 +72,7 @@ impl ToolHandler {
                     .unwrap_or_default();
 
                 if let Some(path) = script_path {
-                     match ToolManager::run_python(path, &script_args, env_vars).await {
+                     match tool_manager.run_python(path, &script_args, env_vars).await {
                          Ok(output) => output,
                          Err(e) => format!("Error running python: {}", e),
                      }
@@ -105,7 +106,7 @@ impl ToolHandler {
             }
             "search_code" => {
                 if let Some(pattern) = args.get("pattern").and_then(|v| v.as_str()) {
-                    match ToolManager::search_code(pattern) {
+                    match tool_manager.search_code(pattern) {
                         Ok(matches) => matches.join("\n"),
                         Err(e) => format!("Error searching code: {}", e),
                     }
@@ -116,7 +117,7 @@ impl ToolHandler {
             "list_files" => {
                 let path = args.get("path").and_then(|v| v.as_str());
                 let depth = args.get("depth").and_then(|v| v.as_i64());
-                match ToolManager::list_files(path, depth) {
+                match tool_manager.list_files(path, depth) {
                     Ok(files) => format!("Files:\n{}", files.join("\n")),
                     Err(e) => format!("Error listing files: {}", e),
                 }
@@ -128,7 +129,7 @@ impl ToolHandler {
                 let start_line = args.get("start_line").and_then(|v| v.as_i64());
                 
                 if let (Some(p), Some(o), Some(n)) = (path, original, new) {
-                    match ToolManager::apply_patch(p, o, n, start_line) {
+                    match tool_manager.apply_patch(p, o, n, start_line) {
                         Ok(_) => "Patch applied successfully".to_string(),
                         Err(e) => format!("Error applying patch: {}", e),
                     }

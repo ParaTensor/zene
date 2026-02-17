@@ -2,10 +2,12 @@ use anyhow::Result;
 use llm_connector::types::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
+use std::sync::Arc;
 use tracing::info;
+
 use crate::engine::plan::Plan;
+pub mod store;
+use store::SessionStore;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Session {
@@ -36,44 +38,28 @@ impl Session {
 
 pub struct SessionManager {
     sessions: HashMap<String, Session>,
-    storage_dir: PathBuf,
+    store: Arc<dyn SessionStore>,
 }
 
 impl SessionManager {
-    pub fn new() -> Result<Self> {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let storage_dir = PathBuf::from(&home).join(".zene/sessions");
-
-        if !storage_dir.exists() {
-            fs::create_dir_all(&storage_dir)?;
-        }
-
+    pub async fn new(store: Arc<dyn SessionStore>) -> Result<Self> {
         let mut manager = Self {
             sessions: HashMap::new(),
-            storage_dir,
+            store,
         };
 
         // Load existing sessions
-        if let Err(e) = manager.load_all() {
+        if let Err(e) = manager.load_all().await {
              info!("Warning: Failed to load sessions: {}", e);
         }
 
         Ok(manager)
     }
 
-    fn load_all(&mut self) -> Result<()> {
-        if !self.storage_dir.exists() {
-             return Ok(());
-        }
-        for entry in fs::read_dir(&self.storage_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "json") {
-                let content = fs::read_to_string(&path)?;
-                if let Ok(session) = serde_json::from_str::<Session>(&content) {
-                    self.sessions.insert(session.id.clone(), session);
-                }
-            }
+    async fn load_all(&mut self) -> Result<()> {
+        let sessions = self.store.load_all().await?;
+        for session in sessions {
+            self.sessions.insert(session.id.clone(), session);
         }
         info!("Loaded {} sessions", self.sessions.len());
         Ok(())
@@ -90,15 +76,11 @@ impl SessionManager {
         }
 
         let session = Session::new(id.clone());
-        // Don't auto-save on creation to avoid empty files, wait for first save
         self.sessions.insert(id.clone(), session);
         self.sessions.get_mut(&id).unwrap()
     }
 
-    pub fn save_session(&self, session: &Session) -> Result<()> {
-        let path = self.storage_dir.join(format!("{}.json", session.id));
-        let content = serde_json::to_string_pretty(session)?;
-        fs::write(path, content)?;
-        Ok(())
+    pub async fn save_session(&self, session: &Session) -> Result<()> {
+        self.store.save(session).await
     }
 }

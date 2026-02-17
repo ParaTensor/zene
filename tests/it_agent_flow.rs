@@ -1,9 +1,12 @@
+use std::sync::Arc;
 use zene::agent::runner::AgentRunner;
 use zene::agent::orchestrator::Orchestrator;
 use zene::agent::client::AgentClient;
 use zene::config::AgentConfig;
 use zene::engine::context::ContextEngine;
 use zene::engine::session::SessionManager;
+use zene::engine::session::store::InMemorySessionStore;
+use zene::engine::tools::ToolManager;
 use zene::testing::MockUserInterface;
 use llm_connector::types::ChatResponse;
 
@@ -12,9 +15,10 @@ async fn test_agent_integration_flow() {
     // 1. Setup Environment
     let ui = Box::new(MockUserInterface::new());
     let context_engine = ContextEngine::new().unwrap();
-    let mut session_manager = SessionManager::new().unwrap();
+    let mut session_manager = SessionManager::new(Arc::new(InMemorySessionStore::new())).await.unwrap();
     let mut session = session_manager.create_session("it_test_user".to_string());
-    
+    let tool_manager = Arc::new(ToolManager::new(None));
+
     // 2. Setup Mocks
     let planner_json = serde_json::json!({
         "id": "plan-1",
@@ -84,6 +88,7 @@ async fn test_agent_integration_flow() {
         planner_client,
         executor_client,
         reflector_client,
+        tool_manager,
         context_engine,
         ui,
     );
