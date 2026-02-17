@@ -1,6 +1,9 @@
 use anyhow::Result;
 use std::env;
 
+pub mod mcp;
+use mcp::McpConfig;
+
 #[derive(Debug, Clone)]
 pub struct RoleConfig {
     pub provider: String,
@@ -14,6 +17,7 @@ pub struct AgentConfig {
     pub planner: RoleConfig,
     pub executor: RoleConfig,
     pub reflector: RoleConfig,
+    pub mcp: McpConfig,
 }
 
 impl AgentConfig {
@@ -29,11 +33,26 @@ impl AgentConfig {
         let planner = Self::load_role_config("PLANNER", &default_provider, &default_model, &default_api_key, &default_base_url);
         let executor = Self::load_role_config("EXECUTOR", &default_provider, &default_model, &default_api_key, &default_base_url);
         let reflector = Self::load_role_config("REFLECTOR", &default_provider, &default_model, &default_api_key, &default_base_url);
+        
+        // Load MCP config from zene_config.toml if present
+        let mcp = if let Ok(content) = std::fs::read_to_string("zene_config.toml") {
+             match toml::from_str::<McpConfig>(&content) {
+                 Ok(config) => config,
+                 Err(e) => {
+                     // For now, print error to stderr but don't crash
+                     eprintln!("Failed to parse zene_config.toml: {}", e);
+                     McpConfig::default()
+                 }
+             }
+        } else {
+            McpConfig::default()
+        };
 
         Ok(Self {
             planner,
             executor,
             reflector,
+            mcp,
         })
     }
 

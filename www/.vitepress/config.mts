@@ -49,6 +49,12 @@ export default defineConfig({
             { text: 'Executor (Zhipu)', link: '/guide/executor' },
             { text: 'Reflector (Minimax)', link: '/guide/reflector' }
           ]
+        },
+        {
+          text: 'Extensibility',
+          items: [
+            { text: 'MCP Integration', link: '/guide/mcp' }
+          ]
         }
       ],
       '/blog/': [

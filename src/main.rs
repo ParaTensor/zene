@@ -12,8 +12,9 @@ mod config;
 use agent::AgentRunner;
 use config::AgentConfig;
 use engine::session::SessionManager;
-use engine::tools::ToolManager;
+use engine::tools::{ToolManager, MCP_MANAGER};
 use engine::ui::{AutoUserInterface, CliUserInterface, UserInterface};
+use engine::mcp::manager::McpManager;
 
 #[derive(Parser)]
 #[command(name = "zene")]
@@ -69,6 +70,23 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .init();
+
+    // Initialize MCP Manager
+    // We load config separately or extract from AgentConfig if possible, 
+    // but AgentConfig currently loads from env.
+    // For now, let's just use default or look for a config file later.
+    // Since we added `mcp` to `AgentConfig`, we can use that.
+    
+    if let Ok(config) = AgentConfig::from_env() {
+         let mcp_manager = McpManager::new(config.mcp.clone());
+         // Connect in background (or await if we want to ensure tools are ready)
+         mcp_manager.connect_all().await;
+         
+         // Set global instance
+         if MCP_MANAGER.set(mcp_manager).is_err() {
+             error!("Failed to set global MCP Manager");
+         }
+    }
 
     let cli = Cli::parse();
 
@@ -241,7 +259,7 @@ async fn handle_request(
             }
         }
         "tools.list" => {
-            let tools = ToolManager::list_tools();
+            let tools = ToolManager::list_tools().await;
             serde_json::json!({ "tools": tools })
         }
         "tools.call" => {

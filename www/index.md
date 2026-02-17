@@ -23,6 +23,9 @@ features:
   - title: Reflector (Minimax)
     details: Automated code review and error correction loop. Verifies logic before commit.
     icon: 🛡️
+  - title: Extensibility (MCP)
+    details: Connect to any external tool via Model Context Protocol. Git, Postgres, Filesystem, and more.
+    icon: 🔌
 ---
 
 <div class="terminal-demo">
