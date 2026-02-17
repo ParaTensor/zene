@@ -1,4 +1,4 @@
-use anyhow::{Result, Context};
+use anyhow::Result;
 use crate::config::mcp::McpConfig;
 use crate::engine::tools::ToolDefinition;
 use zene_mcp::McpClient;

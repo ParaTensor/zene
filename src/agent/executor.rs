@@ -1,7 +1,7 @@
 use anyhow::Result;
 use llm_connector::types::{Message, MessageBlock, Role, Tool};
 use std::collections::HashMap;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::agent::client::AgentClient;
 use crate::agent::tool_handler::ToolHandler;

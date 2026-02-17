@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ignore::WalkBuilder;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tree_sitter::{Parser, Query, QueryCursor};
 use crate::engine::memory::MemoryManager;
 
