@@ -1,33 +1,47 @@
-# Zene Extension Strategy
+# Zene Extension Strategy: Model Context Protocol (MCP)
 
-As Zene has evolved into a headless AI coding engine, its extension strategy focuses on simplicity and standard protocols.
+Zene adopts the **Model Context Protocol (MCP)** as its standard for extensibility. This aligns Zene with the broader AI ecosystem, allowing it to leverage existing MCP servers for tools, data, and resources.
 
-## 1. Primary Extension Model: JSON-RPC (IPC)
+## 1. Why MCP?
 
-Zene adopts the "Sidecar" pattern for extensibility. Instead of loading plugins into its own process memory, Zene connects to external tools via simple **JSON-RPC** over Stdio or HTTP.
+Instead of inventing a custom JSON-RPC protocol, Zene implements the open standard [MCP Specification](https://modelcontextprotocol.io).
 
-### Architecture
+*   **Ecosystem Compatibility**: Zene can immediately use any existing MCP server (e.g., performing Google Searches, querying PostgreSQL, managing Git repositories) without custom plugins.
+*   **Standardization**: MCP defines clear schemas for **Tools** (functions), **Resources** (data reading), and **Prompts**.
+*   **Safety & Simplicity**: Like our original vision, MCP operates over Stdio/HTTP JSON-RPC, keeping extensions isolated in their own processes.
+
+## 2. Architecture
+
+Zene acts as an **MCP Client**, connecting to one or more **MCP Servers**.
+
 ```mermaid
 graph LR
-    Zene[Zene Core] -- JSON-RPC --> Ext1[Postgres Tool]
-    Zene -- JSON-RPC --> Ext2[Git Tool]
-    Zene -- JSON-RPC --> Ext3[Slack Tool]
+    Zene[Zene Core (MCP Client)] -- Stdio/HTTP --> S1[Git MCP Server]
+    Zene -- Stdio/HTTP --> S2[Postgres MCP Server]
+    Zene -- Stdio/HTTP --> S3[Filesystem MCP Server]
+    
+    S1 --> Git[Git Binary]
+    S2 --> DB[(Database)]
+    S3 --> FS[Local Files]
 ```
 
-### Why JSON-RPC?
-- **Simplicity**: Easy to implement in any language (Python, TypeScript, Go, Rust).
-- **Safety**: Extensions run in separate processes. A crash in a plugin cannot bring down the Zene daemon.
-- **Standard**: Well-understood protocol without the complexity of heavier frameworks.
+## 3. Implementation Roadmap
 
-## 2. Legacy / Secondary Model: Wasm
+### Phase 1: Core Client (Current Priority)
+*   Implement `McpClient` in Zene.
+*   Support connecting to local stdio MCP servers via `zene_config.toml`.
+*   Map MCP "Tools" to Zene's internal `ToolDefinition`.
 
-*Note: This is now a secondary priority, reserved for high-performance, tight-loop logic customizations.*
+### Phase 2: Zene as a Server
+*   Expose Zene's internal capabilities (AST search, Codebase understanding) as an MCP Server (`zene-server`).
+*   This allows *other* agents (e.g., Claude Desktop, IDEs) to use Zene's coding brains.
 
-WebAssembly (Wasm) using `wasmtime` remains a theoretical option for:
-- Custom syntax highlighters.
-- Lightweight logic that must run synchronously within the Zene event loop.
+## 4. Configuration Example
 
-## 3. Tool Interface
+Future `zene_config.toml` configuration:
 
-Zene exposes its own capabilities to other agents via JSON-RPC as well.
-- **`zene-server`**: Acts as a JSON-RPC Server, exposing `read_codebase`, `apply_diff`, `run_tests` tools.
+```toml
+[mcp_servers]
+git = { command = "uvx", args = ["mcp-server-git"] }
+postgres = { command = "docker", args = ["run", "-i", "mcp/postgres"] }
+```
