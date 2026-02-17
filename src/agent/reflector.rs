@@ -54,13 +54,29 @@ impl Reflector {
 
         let response = self.client.chat(&prompt).await?;
         
-        // Clean up response (sometimes LLMs wrap in markdown)
-        let clean_json = response
-            .trim()
-            .trim_start_matches("```json")
-            .trim_start_matches("```")
-            .trim_end_matches("```")
-            .trim();
+        // Robust JSON extraction
+        // 1. Remove <think>...</think> blocks (Minimax/DeepSeek specific)
+        let mut content_to_parse = response.as_str();
+        if let Some(end_think) = content_to_parse.rfind("</think>") {
+            if end_think + 8 < content_to_parse.len() {
+                content_to_parse = &content_to_parse[end_think + 8..];
+            }
+        }
+
+        // 2. Extract JSON object by finding first '{' and last '}'
+        let clean_json = if let Some(start) = content_to_parse.find('{') {
+            if let Some(end) = content_to_parse.rfind('}') {
+                if end >= start {
+                    &content_to_parse[start..=end]
+                } else {
+                    content_to_parse
+                }
+            } else {
+                content_to_parse
+            }
+        } else {
+            content_to_parse
+        };
 
         let result: ReflectionResult = serde_json::from_str(clean_json).unwrap_or_else(|_| {
             // Fallback if JSON parsing fails
