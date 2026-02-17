@@ -1,0 +1,88 @@
+/**
+ * Rust / Geek Style Theme for Zene
+ */
+
+/* 引入 JetBrains Mono 字体 (通过 Google Fonts) */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  /* 基础字体 - 使用等宽字体作为首选，体现 CLI 工具特性 */
+  --vp-font-family-base: 'JetBrains Mono', 'Fira Code', monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* 主色调 - Rust 橙色 */
+  --vp-c-brand-1: #dea584; /* 浅橙/肉色 (Rust 风格) */
+  --vp-c-brand-2: #d08770; /* 深一点的橙色 */
+  --vp-c-brand-3: #bf616a; /* 红色/锈色 */
+  --vp-c-brand-soft: rgba(222, 165, 132, 0.16);
+
+  /* 强调色 - 用于链接和按钮 */
+  --vp-c-indigo-1: #a3be8c; /* 绿色 (代表 Success/Healing) */
+  
+  /* 圆角 - 极客风格通常是直角 */
+  --vp-button-alt-border-radius: 0;
+  --vp-button-brand-border-radius: 0;
+  --vp-code-block-border-radius: 0;
+  --vp-nav-logo-height: 24px;
+}
+
+/* 强制深色模式下的变量覆盖 */
+.dark {
+  --vp-c-bg: #0b0c0c; /* 极深的炭黑，接近终端背景 */
+  --vp-c-bg-alt: #161b22; /* 稍浅的背景 */
+  --vp-c-bg-soft: #1c2128;
+  
+  --vp-c-text-1: #e6e6e6;
+  --vp-c-text-2: #a0a0a0;
+  
+  --vp-c-border: #30363d;
+  --vp-c-divider: #30363d;
+  
+  /* Home Hero 区域的大标题颜色 */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(120deg, #dea584 30%, #a3be8c);
+}
+
+/* 全局样式调整 */
+
+/* 移除大部分圆角，增加硬朗感 */
+.VPButton, .VPImage, .box, .custom-block, .VPCodeGroup-header {
+  border-radius: 0 !important;
+}
+
+/* 代码块样式增强 */
+.vp-doc pre {
+  border: 1px solid var(--vp-c-border);
+  background-color: #0d1117 !important; /* GitHub Dark Dimmed 风格 */
+}
+
+/* 导航栏样式 */
+.VPNavBar {
+  border-bottom: 1px solid var(--vp-c-brand-2) !important;
+  background-color: rgba(11, 12, 12, 0.9) !important;
+}
+
+/* 首页 Hero 标题特效 - 模拟光标闪烁 */
+.VPHero .name::after {
+  content: '_';
+  animation: blink 1s step-end infinite;
+  color: var(--vp-c-brand-1);
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* 链接样式 */
+.vp-doc a {
+  text-decoration: none;
+  border-bottom: 1px dashed var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+  transition: all 0.2s;
+}
+
+.vp-doc a:hover {
+  border-bottom-style: solid;
+  color: var(--vp-c-brand-2);
+}
