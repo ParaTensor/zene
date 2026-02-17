@@ -52,3 +52,9 @@ logs/
 
 # Zene specific
 zene.log
+
+# Node & Frontend
+node_modules/
+dist/
+.fastembed_cache/
+temp_workspace/

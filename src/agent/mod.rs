@@ -3,6 +3,9 @@ pub mod prompt;
 pub mod runner;
 pub mod planner;
 pub mod reflector;
+pub mod executor;
+pub mod orchestrator;
+pub mod compactor;
 pub mod tool_handler;
 
 #[allow(unused_imports)]

@@ -143,6 +143,28 @@ impl ToolManager {
                 }),
             },
         ];
+        
+        // Add Memory Tools
+        tools.push(ToolDefinition {
+            name: "memory_search".to_string(),
+            description: "Search for relevant code and documentation using semantic search (RAG)".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "The natural language query describing what you are looking for" }
+                },
+                "required": ["query"]
+            }),
+        });
+
+        tools.push(ToolDefinition {
+            name: "memory_index".to_string(),
+            description: "Index the current project files into the vector memory. Use this if you think the memory is outdated.".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {},
+            }),
+        });
 
         // Append MCP tools dynamically
         if let Some(manager) = MCP_MANAGER.get() {

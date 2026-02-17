@@ -4,10 +4,18 @@ use llm_connector::{
     LlmClient,
 };
 use crate::config::RoleConfig;
+use std::sync::{Arc, Mutex};
+use std::collections::VecDeque;
+
+#[derive(Clone)]
+enum ClientBackend {
+    Real(LlmClient),
+    Mock(Arc<Mutex<VecDeque<ChatResponse>>>),
+}
 
 #[derive(Clone)]
 pub struct AgentClient {
-    client: LlmClient,
+    backend: ClientBackend,
     model: String,
 }
 
@@ -15,8 +23,6 @@ impl AgentClient {
     /// Initialize the agent client with a specific configuration
     pub fn new(config: &RoleConfig) -> Result<Self> {
         let client = if let Some(base_url) = &config.base_url {
-            // If base_url is provided, assume OpenAI compatible protocol for most providers
-            // This allows connecting to any service that mimics OpenAI API (DeepSeek, LocalAI, etc.)
             LlmClient::openai_with_base_url(&config.api_key, base_url)?
         } else {
             match config.provider.as_str() {
@@ -39,9 +45,17 @@ impl AgentClient {
         };
 
         Ok(Self {
-            client,
+            backend: ClientBackend::Real(client),
             model: config.model.clone(),
         })
+    }
+
+    /// Create a mock client that returns the provided sequence of responses
+    pub fn mock(responses: Vec<ChatResponse>) -> Self {
+        Self {
+            backend: ClientBackend::Mock(Arc::new(Mutex::new(VecDeque::from(responses)))),
+            model: "mock-model".to_string(),
+        }
     }
 
     #[allow(dead_code)]
@@ -52,14 +66,25 @@ impl AgentClient {
     /// Run a chat completion without tools
     #[allow(dead_code)]
     pub async fn chat(&self, prompt: &str) -> Result<String> {
-        let request = ChatRequest {
-            model: self.model.clone(),
-            messages: vec![Message::text(llm_connector::types::Role::User, prompt)],
-            ..Default::default()
-        };
-
-        let response = self.client.chat(&request).await?;
-        Ok(response.content)
+        match &self.backend {
+            ClientBackend::Real(client) => {
+                let request = ChatRequest {
+                    model: self.model.clone(),
+                    messages: vec![Message::text(llm_connector::types::Role::User, prompt)],
+                    ..Default::default()
+                };
+                let response = client.chat(&request).await?;
+                Ok(response.content)
+            }
+            ClientBackend::Mock(responses) => {
+                let mut guard = responses.lock().unwrap();
+                if let Some(response) = guard.pop_front() {
+                    Ok(response.content)
+                } else {
+                    Ok("Mock response exhausted".to_string())
+                }
+            }
+        }
     }
 
     /// Run a chat completion with history and tools
@@ -68,17 +93,32 @@ impl AgentClient {
         messages: Vec<Message>,
         tools: Option<Vec<Tool>>,
     ) -> Result<ChatResponse> {
-        let mut request = ChatRequest {
-            model: self.model.clone(),
-            messages,
-            ..Default::default()
-        };
+        match &self.backend {
+            ClientBackend::Real(client) => {
+                let mut request = ChatRequest {
+                    model: self.model.clone(),
+                    messages,
+                    ..Default::default()
+                };
 
-        if let Some(t) = tools {
-            request = request.with_tools(t).with_tool_choice(ToolChoice::auto());
+                if let Some(t) = tools {
+                    request = request.with_tools(t).with_tool_choice(ToolChoice::auto());
+                }
+
+                let response = client.chat(&request).await?;
+                Ok(response)
+            }
+            ClientBackend::Mock(responses) => {
+                let mut guard = responses.lock().unwrap();
+                if let Some(response) = guard.pop_front() {
+                    Ok(response)
+                } else {
+                    Ok(ChatResponse {
+                        content: "Mock response exhausted".to_string(),
+                        ..Default::default()
+                    })
+                }
+            }
         }
-
-        let response = self.client.chat(&request).await?;
-        Ok(response)
     }
 }
