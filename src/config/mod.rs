@@ -18,6 +18,7 @@ pub struct AgentConfig {
     pub executor: RoleConfig,
     pub reflector: RoleConfig,
     pub mcp: McpConfig,
+    pub simple_mode: bool,
 }
 
 impl AgentConfig {
@@ -29,6 +30,10 @@ impl AgentConfig {
             .or_else(|_| env::var("OPENAI_API_KEY"))
             .unwrap_or_default();
         let default_base_url = env::var("LLM_BASE_URL").or_else(|_| env::var("OPENAI_BASE_URL")).ok();
+        
+        let simple_mode = env::var("ZENE_SIMPLE_MODE")
+            .map(|v| v == "1" || v.to_lowercase() == "true")
+            .unwrap_or(false);
 
         let planner = Self::load_role_config("PLANNER", &default_provider, &default_model, &default_api_key, &default_base_url);
         let executor = Self::load_role_config("EXECUTOR", &default_provider, &default_model, &default_api_key, &default_base_url);
@@ -53,6 +58,7 @@ impl AgentConfig {
             executor,
             reflector,
             mcp,
+            simple_mode,
         })
     }
 

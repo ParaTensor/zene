@@ -48,7 +48,7 @@ impl AgentRunner {
     // In the next phase (P3), we will split logic to use planner and reflector.
     pub async fn run(&mut self, task: &str, session: &mut Session) -> Result<String> {
         // Step 1: Initialize Plan if needed
-        if session.plan.is_none() {
+        if !self.config.simple_mode && session.plan.is_none() {
              info!("Initializing new plan for task: {}", task);
              
              // Context Retrieval (L1 - Project Scan) for planning

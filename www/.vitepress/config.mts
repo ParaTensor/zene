@@ -49,7 +49,8 @@ export default defineConfig({
           items: [
             { text: 'Planner', link: '/guide/planner' },
             { text: 'Executor', link: '/guide/executor' },
-            { text: 'Reflector', link: '/guide/reflector' }
+            { text: 'Reflector', link: '/guide/reflector' },
+            { text: 'Simple Mode', link: '/guide/simple-mode' }
           ]
         },
         {
