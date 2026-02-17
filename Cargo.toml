@@ -1,6 +1,6 @@
 [package]
 name = "zene"
-version = "0.3.0"
+version = "0.2.2"
 edition = "2021"
 description = "A minimalist, high-performance multi-agent coding engine written in Rust."
 license = "MIT"
