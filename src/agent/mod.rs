@@ -3,6 +3,7 @@ pub mod prompt;
 pub mod runner;
 pub mod planner;
 pub mod reflector;
+pub mod tool_handler;
 
 #[allow(unused_imports)]
 pub use client::AgentClient;

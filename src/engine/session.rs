@@ -12,6 +12,7 @@ pub struct Session {
     pub id: String,
     pub history: Vec<Message>,
     pub plan: Option<Plan>, // Store the execution plan
+    pub env_vars: HashMap<String, String>, // Session-scoped environment variables
     pub created_at: u64,
     pub last_updated_at: u64,
 }
@@ -26,6 +27,7 @@ impl Session {
             id,
             history: Vec::new(),
             plan: None,
+            env_vars: HashMap::new(),
             created_at: now,
             last_updated_at: now,
         }

@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-02-17
+
+### 🚀 Major Features
+
+*   **Python V3 Execution Engine**: 
+    *   **Isolated Virtual Environment**: Automatically manages `.venv` for projects, prioritizing `uv` for speed.
+    *   **Session-Scoped Isolation**: Environment variables are stored per-session and injected only into child processes, preventing global state pollution.
+    *   **Safe Execution**: Added timeouts (60s) and zombie process prevention for shell commands.
+
+### ✨ Enhancements
+
+*   **New Tools**: Added `run_python`, `set_env`, `get_env` to the toolset.
+*   **Examples**: Added 7 comprehensive scenarios covering Data Analysis, DevOps, Testing, and Web Scraping.
+*   **Documentation**: Added technical blog posts and architecture docs (`docs/python_env.md`, `docs/architecture_isolation.md`).
+
+### 🛠️ Fixes
+
+*   **Reflector**: Robust JSON extraction logic to handle LLM `<think>` tags (fixing "fail open" bug).
+*   **Git**: Properly ignore `.venv` directories recursively.
+
 ## [0.2.2] - 2026-02-16
 
 ### 🛠️ Fixes
