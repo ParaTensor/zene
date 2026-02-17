@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-02-17
+
+### Added
+- **High-Level API**: Introduced `ZeneEngine` facade, providing a simplified and stable entrance for library users.
+- **Session Abstraction**: Defined `SessionStore` trait and implemented `FileSessionStore` and `InMemorySessionStore` for flexible persistence.
+- **Observability**: Added structured `AgentEvent` streaming, allowing real-time monitoring of planning, tool calls, and reflection.
+- **Dependency Injection**: Refactored core components (`Orchestrator`, `Executor`, `ToolManager`) to support dependency injection, eliminating global static state.
+
+### Changed
+- **CLI Refactor**: Completely decoupled CLI/JSON-RPC logic from the core library; `main.rs` now acts as a thin wrapper around `ZeneEngine`.
+- **Async Sessions**: Transitioned `SessionManager` to an asynchronous interface powered by `async-trait`.
+
 ## [0.3.1] - 2026-02-17
 
 ### Added

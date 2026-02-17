@@ -1,19 +1,22 @@
 use anyhow::Result;
-
+use std::sync::Arc;
 
 use crate::agent::client::AgentClient;
 use crate::agent::orchestrator::Orchestrator;
 use crate::engine::context::ContextEngine;
 use crate::engine::session::Session;
 use crate::engine::ui::UserInterface;
+use crate::engine::tools::ToolManager;
 use crate::config::AgentConfig;
+use crate::engine::contracts::AgentEvent;
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct AgentRunner {
     orchestrator: Orchestrator,
 }
 
 impl AgentRunner {
-    pub fn new(config: AgentConfig, user_interface: Box<dyn UserInterface>) -> Result<Self> {
+    pub fn new(config: AgentConfig, tool_manager: Arc<ToolManager>, user_interface: Box<dyn UserInterface>) -> Result<Self> {
         let planner_client = AgentClient::new(&config.planner)?;
         let executor_client = AgentClient::new(&config.executor)?;
         let reflector_client = AgentClient::new(&config.reflector)?;
@@ -25,6 +28,7 @@ impl AgentRunner {
             planner_client,
             executor_client,
             reflector_client,
+            tool_manager,
             context_engine,
             user_interface,
         );
@@ -36,9 +40,13 @@ impl AgentRunner {
         self.orchestrator.run(task, session).await
     }
 
-    /// Create a runner with a pre-configured orchestrator (useful for testing)
     pub fn new_with_orchestrator(orchestrator: Orchestrator) -> Self {
         Self { orchestrator }
+    }
+
+    pub fn with_event_sender(mut self, sender: UnboundedSender<AgentEvent>) -> Self {
+        self.orchestrator = self.orchestrator.with_event_sender(sender);
+        self
     }
 }
 

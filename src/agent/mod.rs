@@ -7,6 +7,7 @@ pub mod executor;
 pub mod orchestrator;
 pub mod compactor;
 pub mod tool_handler;
+pub mod engine;
 
 #[allow(unused_imports)]
 pub use client::AgentClient;
@@ -15,3 +16,4 @@ pub use runner::AgentRunner;
 pub use planner::Planner;
 #[allow(unused_imports)]
 pub use reflector::Reflector;
+pub use engine::ZeneEngine;

@@ -1,25 +1,43 @@
 use anyhow::Result;
 use llm_connector::types::{Message, MessageBlock, Role, Tool};
 use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::info;
 
 use crate::agent::client::AgentClient;
 use crate::agent::tool_handler::ToolHandler;
+use crate::engine::contracts::AgentEvent;
 use crate::engine::context::ContextEngine;
 use crate::engine::plan::Task;
 use crate::engine::tools::ToolManager;
 use crate::engine::ui::UserInterface;
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct Executor {
     client: AgentClient,
+    tool_manager: Arc<ToolManager>,
     max_iterations: usize,
+    event_sender: Option<UnboundedSender<AgentEvent>>,
 }
 
 impl Executor {
-    pub fn new(client: AgentClient) -> Self {
+    pub fn new(client: AgentClient, tool_manager: Arc<ToolManager>) -> Self {
         Self {
             client,
+            tool_manager,
             max_iterations: 8, // Default task iteration limit
+            event_sender: None,
+        }
+    }
+
+    pub fn with_event_sender(mut self, sender: UnboundedSender<AgentEvent>) -> Self {
+        self.event_sender = Some(sender);
+        self
+    }
+
+    fn emit(&self, event: AgentEvent) {
+        if let Some(sender) = &self.event_sender {
+            let _ = sender.send(event);
         }
     }
 
@@ -51,8 +69,8 @@ impl Executor {
         );
         history.push(Message::user(&task_prompt));
 
-        // Get tools
-        let tools: Vec<Tool> = ToolManager::list_tools().await
+        // Get tools from injected manager
+        let tools: Vec<Tool> = self.tool_manager.list_tools().await
             .into_iter()
             .map(|def| Tool::function(def.name, Some(def.description), def.input_schema))
             .collect();
@@ -92,7 +110,13 @@ impl Executor {
                 let args_str = &tool_call.function.arguments;
                 let args: serde_json::Value = serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
 
+                self.emit(AgentEvent::ToolCall { 
+                    name: tool_name.to_string(), 
+                    arguments: args.clone() 
+                });
+
                 let result_content = ToolHandler::execute(
+                    &self.tool_manager,
                     user_interface,
                     tool_name,
                     &args,
@@ -100,6 +124,11 @@ impl Executor {
                     env_vars,
                     context_engine
                 ).await;
+
+                self.emit(AgentEvent::ToolResult { 
+                    name: tool_name.to_string(), 
+                    result: result_content.clone() 
+                });
 
                 let tool_msg = Message {
                     role: Role::Tool,
@@ -120,6 +149,8 @@ mod tests {
     use super::*;
     use crate::testing::MockUserInterface;
     use crate::engine::session::SessionManager;
+    use crate::engine::session::store::InMemorySessionStore;
+    use crate::agent::client::AgentClient;
     use llm_connector::types::ChatResponse;
     
     #[tokio::test]
@@ -127,8 +158,8 @@ mod tests {
         // Setup Mocks
         let ui = Box::new(MockUserInterface::new());
         let mut context_engine = ContextEngine::new().unwrap();
-        let mut session_manager = SessionManager::new().unwrap();
-        let mut session = session_manager.create_session("test_executor".to_string());
+        let mut session_manager = SessionManager::new(Arc::new(InMemorySessionStore::new())).await.unwrap();
+        let session = session_manager.create_session("test_executor".to_string());
         
         // Construct responses using JSON to bypass missing ChatChoice type export
         let tool_call_json = serde_json::json!({
@@ -176,7 +207,8 @@ mod tests {
         let final_resp: ChatResponse = serde_json::from_value(final_json).unwrap();
         
         let client = AgentClient::mock(vec![tool_call_resp, final_resp]);
-        let executor = Executor::new(client);
+        let tool_manager = Arc::new(ToolManager::new(None));
+        let executor = Executor::new(client, tool_manager);
         
         // ... (rest of test)
         
