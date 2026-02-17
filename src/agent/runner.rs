@@ -6,6 +6,7 @@ use crate::agent::client::AgentClient;
 use crate::agent::planner::Planner;
 use crate::agent::reflector::Reflector;
 use crate::engine::context::ContextEngine;
+use crate::agent::tool_handler::ToolHandler;
 use crate::engine::plan::{Task, TaskStatus};
 use crate::engine::session::Session;
 use crate::engine::tools::ToolManager;
@@ -93,7 +94,7 @@ impl AgentRunner {
 
                 current_task.status = TaskStatus::InProgress;
 
-                match self.execute_task(current_task, session.history.clone()).await {
+                match self.execute_task(current_task, session.history.clone(), &mut session.env_vars).await {
                     Ok(output) => {
                         info!("Task {} Completed", current_task.id);
                         current_task.result = Some(output.clone());
@@ -253,7 +254,13 @@ impl AgentRunner {
                 let args_str = &tool_call.function.arguments;
                 let args: serde_json::Value = serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
 
-                let result_content = self.execute_tool_logic(tool_name, &args, args_str).await;
+                let result_content = ToolHandler::execute(
+                    self.user_interface.as_ref(),
+                    tool_name,
+                    &args,
+                    args_str,
+                    &mut session.env_vars
+                ).await;
 
                 // Add tool result to history
                 let tool_msg = Message {
@@ -268,7 +275,7 @@ impl AgentRunner {
         Ok("Task stopped: Max iterations reached".to_string())
     }
 
-    async fn execute_task(&self, task: &Task, mut history: Vec<Message>) -> Result<String> {
+    async fn execute_task(&self, task: &Task, mut history: Vec<Message>, env_vars: &mut std::collections::HashMap<String, String>) -> Result<String> {
         let client = &self.executor_client;
         
         // Add specific instruction for this task
@@ -326,7 +333,13 @@ impl AgentRunner {
                 let args_str = &tool_call.function.arguments;
                 let args: serde_json::Value = serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
 
-                let result_content = self.execute_tool_logic(tool_name, &args, args_str).await;
+                let result_content = ToolHandler::execute(
+                    self.user_interface.as_ref(),
+                    tool_name,
+                    &args,
+                    args_str,
+                    env_vars
+                ).await;
 
                 let tool_msg = Message {
                     role: Role::Tool,
@@ -341,91 +354,6 @@ impl AgentRunner {
         Ok("Task stopped: Max iterations reached".to_string())
     }
 
-    async fn execute_tool_logic(&self, tool_name: &str, args: &serde_json::Value, args_str: &str) -> String {
-        if (tool_name == "run_command" || tool_name == "write_file" || tool_name == "apply_patch")
-            && !self.user_interface.confirm_execution(tool_name, args_str)
-        {
-            return "User denied execution".to_string();
-        }
 
-        match tool_name {
-            "read_file" => {
-                if let Some(path) = args.get("path").and_then(|v| v.as_str()) {
-                    match ToolManager::read_file(path) {
-                        Ok(content) => content,
-                        Err(e) => format!("Error reading file: {}", e),
-                    }
-                } else {
-                    "Error: Missing path argument".to_string()
-                }
-            }
-            "write_file" => {
-                let path = args.get("path").and_then(|v| v.as_str());
-                let content = args.get("content").and_then(|v| v.as_str());
-                if let (Some(p), Some(c)) = (path, content) {
-                    match ToolManager::write_file(p, c) {
-                        Ok(_) => "File written successfully".to_string(),
-                        Err(e) => format!("Error writing file: {}", e),
-                    }
-                } else {
-                    "Error: Missing path or content argument".to_string()
-                }
-            }
-            "fetch_url" => {
-                if let Some(url) = args.get("url").and_then(|v| v.as_str()) {
-                    match ToolManager::fetch_url(url).await {
-                        Ok(content) => content,
-                        Err(e) => format!("Error fetching URL: {}", e),
-                    }
-                } else {
-                    "Error: Missing url argument".to_string()
-                }
-            }
-            "run_command" => {
-                if let Some(cmd) = args.get("command").and_then(|v| v.as_str()) {
-                    match ToolManager::run_command(cmd) {
-                        Ok(output) => output,
-                        Err(e) => format!("Error running command: {}", e),
-                    }
-                } else {
-                    "Error: Missing command argument".to_string()
-                }
-            }
-            "search_code" => {
-                if let Some(pattern) = args.get("pattern").and_then(|v| v.as_str()) {
-                    match ToolManager::search_code(pattern) {
-                        Ok(matches) => matches.join("\n"),
-                        Err(e) => format!("Error searching code: {}", e),
-                    }
-                } else {
-                    "Error: Missing pattern argument".to_string()
-                }
-            }
-            "list_files" => {
-                let path = args.get("path").and_then(|v| v.as_str());
-                let depth = args.get("depth").and_then(|v| v.as_i64());
-                match ToolManager::list_files(path, depth) {
-                    Ok(files) => format!("Files:\n{}", files.join("\n")),
-                    Err(e) => format!("Error listing files: {}", e),
-                }
-            }
-            "apply_patch" => {
-                let path = args.get("path").and_then(|v| v.as_str());
-                let original = args.get("original_snippet").and_then(|v| v.as_str());
-                let new = args.get("new_snippet").and_then(|v| v.as_str());
-                let start_line = args.get("start_line").and_then(|v| v.as_i64());
-                
-                if let (Some(p), Some(o), Some(n)) = (path, original, new) {
-                    match ToolManager::apply_patch(p, o, n, start_line) {
-                        Ok(_) => "Patch applied successfully".to_string(),
-                        Err(e) => format!("Error applying patch: {}", e),
-                    }
-                } else {
-                    "Error: Missing arguments (path, original_snippet, new_snippet)".to_string()
-                }
-            }
-            _ => format!("Error: Unknown tool {}", tool_name),
-        }
-    }
 }
 
