@@ -26,8 +26,9 @@ print(f"TEST_VAR: {os.environ.get('TEST_VAR')}")
     // 3. Run Python using ToolManager
     println!("🚀 Running python script via ToolManager::run_python...");
     let args = vec![];
-    let tm = ToolManager::new(None);
-    let output = tm.run_python(script_path, &args, &env_vars).await?;
+    let context_engine = std::sync::Arc::new(tokio::sync::Mutex::new(zene::engine::context::ContextEngine::new(false)?));
+    let tool_manager = ToolManager::new(None, context_engine);
+    let output = tool_manager.run_python(script_path, &args, &env_vars).await?;
 
     println!("--- Script Output ---");
     println!("{}", output);

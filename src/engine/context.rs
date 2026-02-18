@@ -15,18 +15,22 @@ pub struct ContextEngine {
 }
 
 impl ContextEngine {
-    pub fn new() -> Result<Self> {
+    pub fn new(use_memory: bool) -> Result<Self> {
         let mut parser = Parser::new();
         // Default to Rust for now, in reality we'd swap languages dynamically
         parser.set_language(tree_sitter_rust::language())?;
         
-        let root = std::env::current_dir()?;
-        let memory = match MemoryManager::new(&root) {
-            Ok(m) => Some(m),
-            Err(e) => {
-                tracing::warn!("Failed to initialize MemoryManager: {}", e);
-                None
+        let memory = if use_memory {
+            let root = std::env::current_dir()?;
+            match MemoryManager::new(&root) {
+                Ok(m) => Some(m),
+                Err(e) => {
+                    tracing::warn!("Failed to initialize MemoryManager: {}", e);
+                    None
+                }
             }
+        } else {
+            None
         };
 
         Ok(Self { 
@@ -144,5 +148,20 @@ impl ContextEngine {
         } else {
              Err(ZeneError::InternalError("Memory engine not initialized".to_string()))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_context_engine_optional_memory() {
+        // Test with memory disabled
+        let engine_no_mem = ContextEngine::new(false).unwrap();
+        assert!(engine_no_mem.memory.is_none());
+
+        // Test with memory enabled (this will load fastembed, might be slow or fail if no internet, but it should be initialized if logic is correct)
+        // We can't easily test "Some" without actually loading the model, but we've verified "None".
     }
 }

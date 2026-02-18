@@ -1,6 +1,9 @@
 use anyhow::Result;
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use zene::engine::context::ContextEngine;
 use zene::engine::tools::ToolManager;
 
 fn setup_test_file(path: &Path, content: &str) -> Result<()> {
@@ -20,7 +23,8 @@ fn test_patch_exact_match() -> Result<()> {
     let original = "line2\nline3";
     let new = "line2_modified\nline3_modified";
 
-    let tm = ToolManager::new(None);
+    let context_engine = Arc::new(Mutex::new(ContextEngine::new(false)?));
+    let tm = ToolManager::new(None, context_engine);
     tm.apply_patch(path.to_str().unwrap(), original, new, None)?;
 
     let result = fs::read_to_string(path)?;
@@ -39,7 +43,8 @@ fn test_patch_fuzzy_whitespace() -> Result<()> {
     let original = "  let a = 1;\n  let b = 2;";
     let new = "    let a = 10;\n    let b = 20;";
 
-    let tm = ToolManager::new(None);
+    let context_engine = Arc::new(Mutex::new(ContextEngine::new(false)?));
+    let tm = ToolManager::new(None, context_engine);
     tm.apply_patch(path.to_str().unwrap(), original, new, None)?;
 
     let result = fs::read_to_string(path)?;
@@ -61,7 +66,8 @@ fn test_patch_start_line_hint() -> Result<()> {
     let new = "start_2\nend_2";
     
     // Hint: it's around line 6
-    let tm = ToolManager::new(None);
+    let context_engine = Arc::new(Mutex::new(ContextEngine::new(false)?));
+    let tm = ToolManager::new(None, context_engine);
     tm.apply_patch(path.to_str().unwrap(), original, new, Some(6))?;
 
     let result = fs::read_to_string(path)?;
@@ -78,7 +84,8 @@ fn test_patch_failure_not_found() {
     let original = "line3"; // Does not exist
     let new = "line3_new";
 
-    let tm = ToolManager::new(None);
+    let context_engine = Arc::new(Mutex::new(ContextEngine::new(false).unwrap()));
+    let tm = ToolManager::new(None, context_engine);
     let result = tm.apply_patch(path.to_str().unwrap(), original, new, None);
     assert!(result.is_err());
 }

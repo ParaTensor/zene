@@ -1,4 +1,4 @@
-# Zene Roadmap
+# Roadmap
 
 This roadmap outlines the evolution of Zene from a high-performance engine into a production-grade AI coding platform.
 

@@ -16,13 +16,14 @@ use crate::config::AgentConfig;
 use crate::engine::contracts::{AgentEvent, TokenUsage};
 use llm_connector::types::Message;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::Mutex;
 
 pub struct Orchestrator {
     planner: Planner,
     executor: Executor,
     reflector: Reflector,
     compactor: SessionCompactor,
-    context_engine: ContextEngine,
+    context_engine: Arc<Mutex<ContextEngine>>,
     user_interface: Box<dyn UserInterface>,
     config: AgentConfig,
     event_sender: Option<UnboundedSender<AgentEvent>>,
@@ -35,7 +36,7 @@ impl Orchestrator {
         executor_client: AgentClient,
         reflector_client: AgentClient,
         tool_manager: Arc<ToolManager>,
-        context_engine: ContextEngine,
+        context_engine: Arc<Mutex<ContextEngine>>,
         user_interface: Box<dyn UserInterface>,
     ) -> Self {
         let planner = Planner::new(planner_client);
@@ -76,7 +77,7 @@ impl Orchestrator {
             info!("Orchestrator: Initializing plan for goal: {}", goal);
             
             let root = std::env::current_dir()?;
-            let files = self.context_engine.list_files(&root, Some(2));
+            let files = self.context_engine.lock().await.list_files(&root, Some(2));
             let project_context = format!("{:?}", files);
 
             match self.planner.create_plan(goal, &project_context).await {
@@ -120,13 +121,12 @@ impl Orchestrator {
 
                  // Execute in parallel
                  let env_vars_shared = Arc::new(tokio::sync::Mutex::new(session.env_vars.clone()));
-                 let context_engine_shared = Arc::new(tokio::sync::Mutex::new(self.context_engine.clone()));
                  let start_time = std::time::Instant::now();
                  let result = self.executor.execute_task(
                      current_task,
                      &mut session.history,
                      env_vars_shared.clone(),
-                     context_engine_shared.clone(),
+                     self.context_engine.clone(),
                      self.user_interface.as_ref()
                  ).await;
                  let duration = start_time.elapsed();
@@ -134,10 +134,6 @@ impl Orchestrator {
                  // Sync back updates
                  session.env_vars = Arc::try_unwrap(env_vars_shared)
                      .map_err(|_| "Failed to unwrap env_vars_shared")
-                     .unwrap()
-                     .into_inner();
-                 self.context_engine = Arc::try_unwrap(context_engine_shared)
-                     .map_err(|_| "Failed to unwrap context_engine_shared")
                      .unwrap()
                      .into_inner();
 
@@ -261,13 +257,12 @@ impl Orchestrator {
              // Execute in parallel
              let start_time = std::time::Instant::now();
              let env_vars_shared = Arc::new(tokio::sync::Mutex::new(session.env_vars.clone()));
-             let context_engine_shared = Arc::new(tokio::sync::Mutex::new(self.context_engine.clone()));
              
              let result = self.executor.execute_task(
                  &adhoc_task, 
                  &mut session.history, 
                  env_vars_shared.clone(), 
-                 context_engine_shared.clone(),
+                 self.context_engine.clone(),
                  self.user_interface.as_ref()
              ).await?;
              let duration = start_time.elapsed();
@@ -305,10 +300,6 @@ impl Orchestrator {
                  .map_err(|_| "Failed to unwrap env_vars_shared")
                  .unwrap()
                  .into_inner();
-             self.context_engine = Arc::try_unwrap(context_engine_shared)
-                 .map_err(|_| "Failed to unwrap context_engine_shared")
-                 .unwrap()
-                 .into_inner();
              
              return Ok((output, usage));
         }
@@ -328,10 +319,11 @@ mod tests {
     async fn test_orchestrator_simple_plan() {
         // Setup Mocks
         let ui = Box::new(MockUserInterface::new());
-        let context_engine = ContextEngine::new().unwrap();
+        let context_engine = ContextEngine::new(false).unwrap();
+        let context_engine_shared = Arc::new(tokio::sync::Mutex::new(context_engine));
         let mut session_manager = SessionManager::new(Arc::new(InMemorySessionStore::new())).await.unwrap();
         let mut session = session_manager.create_session("test_orch".to_string());
-        let tool_manager = Arc::new(ToolManager::new(None));
+        let tool_manager = Arc::new(ToolManager::new(None, context_engine_shared.clone()));
         
         // Construct dummy config
         let config = AgentConfig {
@@ -340,6 +332,7 @@ mod tests {
              reflector: crate::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None },
              mcp: crate::config::mcp::McpConfig::default(),
              simple_mode: false,
+             use_semantic_memory: false,
              xtrace_endpoint: None,
              xtrace_token: None,
         };
@@ -407,7 +400,7 @@ mod tests {
             executor_client,
             reflector_client,
             tool_manager,
-            context_engine,
+            context_engine_shared,
             ui,
         );
 

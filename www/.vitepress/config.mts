@@ -24,6 +24,7 @@ export default defineConfig({
 
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'Roadmap', link: '/roadmap' },
       { text: 'Blog', link: '/blog/' },
       { text: 'Examples', link: '/examples/' },
       {
@@ -55,10 +56,19 @@ export default defineConfig({
           ]
         },
         {
-          text: 'Deep Dive',
+          text: 'Advanced',
           items: [
             { text: 'MCP Integration', link: '/guide/mcp' },
+            { text: 'Python Environment', link: '/guide/python' },
             { text: 'Testing & Architecture', link: '/guide/testing' }
+          ]
+        },
+        {
+          text: 'Design Specs',
+          items: [
+            { text: 'Multi-User Service', link: '/design/multi-user' },
+            { text: 'Warm Pool', link: '/design/warm-pool' },
+            { text: 'Spawn vs Daemon', link: '/design/spawn-vs-daemon' }
           ]
         }
       ],

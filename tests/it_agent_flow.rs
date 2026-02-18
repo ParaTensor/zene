@@ -14,10 +14,10 @@ use llm_connector::types::ChatResponse;
 async fn test_agent_integration_flow() {
     // 1. Setup Environment
     let ui = Box::new(MockUserInterface::new());
-    let context_engine = ContextEngine::new().unwrap();
+    let context_engine = Arc::new(tokio::sync::Mutex::new(ContextEngine::new(false).unwrap()));
     let mut session_manager = SessionManager::new(Arc::new(InMemorySessionStore::new())).await.unwrap();
     let mut session = session_manager.create_session("it_test_user".to_string());
-    let tool_manager = Arc::new(ToolManager::new(None));
+    let tool_manager = Arc::new(ToolManager::new(None, context_engine.clone()));
 
     // 2. Setup Mocks
     let planner_json = serde_json::json!({
@@ -80,6 +80,7 @@ async fn test_agent_integration_flow() {
          reflector: zene::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None },
          mcp: zene::config::mcp::McpConfig::default(),
          simple_mode: false,
+         use_semantic_memory: false,
          xtrace_endpoint: None,
          xtrace_token: None,
     };

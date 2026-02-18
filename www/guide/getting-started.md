@@ -45,6 +45,10 @@ export ZENE_EXECUTOR_API_KEY="sk-..."
 # Reflector (Minimax is excellent for critique)
 export ZENE_REFLECTOR_PROVIDER="minimax"
 export ZENE_REFLECTOR_API_KEY="sk-..."
+
+# Optional: Enable Semantic Memory (RAG)
+# Default: false (saves ~200MB RAM)
+export ZENE_USE_SEMANTIC_MEMORY=true
 ```
 
 ## Usage

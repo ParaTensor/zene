@@ -7,7 +7,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     println!("Initializing Context Engine...");
-    let mut context_engine = ContextEngine::new()?;
+    let mut context_engine = ContextEngine::new(true)?;
 
     println!("Indexing current project (this might take a moment)...");
     let root = std::env::current_dir()?;

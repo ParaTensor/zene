@@ -184,7 +184,7 @@ mod tests {
     async fn test_executor_simple_tool_flow() {
         // Setup Mocks
         let ui = Box::new(MockUserInterface::new());
-        let context_engine = ContextEngine::new().unwrap();
+        let context_engine = ContextEngine::new(false).unwrap();
         let mut session_manager = SessionManager::new(Arc::new(InMemorySessionStore::new())).await.unwrap();
         let session = session_manager.create_session("test_executor".to_string());
         
@@ -234,7 +234,8 @@ mod tests {
         let final_resp: ChatResponse = serde_json::from_value(final_json).unwrap();
         
         let client = AgentClient::mock(vec![tool_call_resp, final_resp]);
-        let tool_manager = Arc::new(ToolManager::new(None));
+        let context_engine_shared = Arc::new(tokio::sync::Mutex::new(context_engine.clone()));
+        let tool_manager = Arc::new(ToolManager::new(None, context_engine_shared.clone()));
         let executor = Executor::new(client, tool_manager);
         
         // ... (rest of test)

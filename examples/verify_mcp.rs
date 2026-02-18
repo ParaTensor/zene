@@ -26,7 +26,8 @@ async fn main() -> anyhow::Result<()> {
     mcp_manager.connect_all().await;
     
     // 4. Initialize ToolManager with injected McpManager
-    let tool_manager = ToolManager::new(Some(mcp_manager));
+    let context_engine = std::sync::Arc::new(tokio::sync::Mutex::new(zene::engine::context::ContextEngine::new(false)?));
+    let tool_manager = ToolManager::new(Some(mcp_manager), context_engine);
 
     // 5. List Tools
     info!("Listing tools...");

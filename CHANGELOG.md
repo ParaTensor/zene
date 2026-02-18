@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.3] - 2026-02-19
+
+### Added
+- **Optional Semantic Memory**: Semantic memory (RAG) is now opt-in via `ZENE_USE_SEMANTIC_MEMORY=true`, saving ~200MB of RAM by default.
+
+### Changed
+- **Shared Context Engine**: `ContextEngine` is now initialized once and shared across all components via `Arc<Mutex<ContextEngine>>`, preventing redundant model loading.
+- **Documentation Consolidation**: All documentation has been unified into the `www/` directory and is served via the VitePress site at [zene.run](https://zene.run). The redundant `docs/` folder has been removed.
+
 ## [0.4.2] - 2026-02-18
 
 ### Changed

@@ -1,32 +1,48 @@
 # Context Memory
-2: 
-3: Zene employs a sophisticated tiered memory system to handle large codebases and long-running sessions without overwhelming the LLM's context window.
-4: 
-5: ## Tiered Architecture
-6: 
-7: ### Tier 1: Hot Context
-8: - **What**: The immediate conversation history and currently open files.
-9: - **Mechanism**: Direct injection into the LLM prompt.
-10: - **Limit**: Restricted by the model's context window (e.g., 128k tokens).
-11: 
-12: ### Tier 2: vector Search (RAG)
-13: - **What**: Semantic search over the entire project codebase.
-14: - **Mechanism**:
-15:     - Uses `fastembed-rs` to generate embeddings for code chunks.
-16:     - Uses `usearch` for high-performance local vector searching.
-17:     - Enables the agent to find relevant code snippets based on natural language queries ("Find the authentication logic") rather than just regex keywoards.
-18: - **Tools**: `memory_search` and `context_search`.
-19: 
-20: ### Tier 3: Session Compaction
-21: - **What**: Summarization of older conversation history.
-22: - **Mechanism**:
-23:     - When the session history exceeds a threshold (default: 20 messages), the `SessionCompactor` activates.
-24:     - It summarizes the middle portion of the conversation, preserving the initial system prompt and the most recent context.
-25:     - This ensures the agent retains "long-term memory" of decisions without wasting tokens on old chit-chat.
-26: 
-27: ## Usage
-28: 
-29: The Context Engine manages these tiers automatically. When you run Zene:
-30: 1. It indexes your project files (Tier 2).
-31: 2. It monitors your session length (Tier 3).
-32: 3. It proactively retrieves relevant context for tasks.
+
+Zene employs a sophisticated tiered memory system to handle large codebases and long-running sessions without overwhelming the LLM's context window.
+
+## Tiered Architecture
+
+Context is loaded dynamically based on task depth to save tokens and improve accuracy.
+
+### Tier 1: Project Structure (L1) / Hot Context
+- **Tool**: `ignore` (File walking).
+- **Content**: Directory tree, filenames, and immediate conversation history.
+- **Purpose**: Macro understanding and immediate dialogue.
+- **Trigger**: Session initialization.
+
+### Tier 2: Syntax Structure (L2) - *Core*
+- **Tool**: `tree-sitter` (Parsing).
+- **Content**: Function signatures, struct/enum definitions, and cross-file references.
+- **Purpose**: Interface contracts without reading full source code.
+- **Trigger**: Dependency analysis and definition lookups.
+
+### Tier 3: Semantic Vector Memory (RAG)
+- **What**: Semantic search over the entire project codebase.
+- **Status**: **Opt-in** (Disabled by default to save ~200MB RAM).
+- **Mechanism**:
+    - Uses `fastembed-rs` to generate embeddings for code chunks.
+    - Uses `usearch` for high-performance local vector searching.
+    - Enables the agent to find relevant code snippets based on natural language queries.
+- **Tools**: `memory_search` and `context_search`.
+
+### Tier 4: Session Compaction
+- **What**: Summarization of older conversation history.
+- **Mechanism**:
+    - When history exceeds a threshold, the `SessionCompactor` summarizes the middle portion, preserving system prompt and recent context.
+
+## Performance & Opt-in
+
+By default, Zene aims for a minimalist footprint. Semantic memory requires loading transformer models which consume significant memory.
+
+To enable Tier 3 Vector Search, set the following environment variable:
+
+```bash
+export ZENE_USE_SEMANTIC_MEMORY=true
+```
+
+## Dynamic Management
+- **Smart Pruning**: Automatically removes AST nodes unrelated to the current task.
+- **Token Monitoring**: Real-time counting and summarization.
+- **Relevance Ranking**: Retreived snippets are sorted by importance.

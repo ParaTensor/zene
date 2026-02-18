@@ -26,6 +26,9 @@ features:
   - title: Extensibility (MCP)
     details: Connect to any external tool via Model Context Protocol. Git, Postgres, Filesystem, and more.
     icon: 🔌
+  - title: Minimalist Footprint
+    details: Opt-in Semantic Memory (RAG) saves ~200MB of RAM. High performance by design.
+    icon: 🍃
 ---
 
 <div class="terminal-demo">

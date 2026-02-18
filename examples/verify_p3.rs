@@ -37,10 +37,11 @@ async fn main() -> Result<()> {
     let ui = Box::new(MockUI);
     
     // Setup dependency injection
+    let context_engine = std::sync::Arc::new(tokio::sync::Mutex::new(zene::engine::context::ContextEngine::new(false)?));
     let mcp_manager = std::sync::Arc::new(zene::engine::mcp::manager::McpManager::new(config.mcp.clone()));
-    let tool_manager = std::sync::Arc::new(zene::engine::tools::ToolManager::new(Some(mcp_manager)));
+    let tool_manager = std::sync::Arc::new(zene::engine::tools::ToolManager::new(Some(mcp_manager), context_engine.clone()));
     
-    let mut runner = AgentRunner::new(config.clone(), tool_manager, ui)?;
+    let mut runner = AgentRunner::new(config.clone(), tool_manager, context_engine, ui)?;
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let storage_dir = PathBuf::from(&home).join(".zene/sessions");
     let store = Arc::new(FileSessionStore::new(storage_dir)?);

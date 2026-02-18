@@ -38,13 +38,17 @@ cargo build --release
 
 ## 🛠️ Usage
 
-### 1. Set API Key
-Zene prioritizes DeepSeek but supports OpenAI as a fallback.
+### 1. Set Environment Variables
+Zene prioritizes DeepSeek but supports OpenAI as a fallback. Semantic memory (RAG) is optional to keep baseline memory low (~200MB savings).
 
 ```bash
+# API Keys
 export DEEPSEEK_API_KEY="sk-..."
-# OR
 export OPENAI_API_KEY="sk-..."
+
+# Optional: Enable Semantic Memory (RAG)
+# Default is false. When false, fastembed models are not loaded.
+export ZENE_USE_SEMANTIC_MEMORY=true
 ```
 
 ### 2. Run a Task (One-Shot)
@@ -100,11 +104,13 @@ Sessions are automatically persisted to `~/.zene/sessions/<session_id>.json`.
 
 ## 📚 Documentation
 
-*   [Architecture Design](docs/ARCHITECTURE.md)
-*   [Agent Workflow](docs/AGENT_FLOW.md)
-*   [Context Strategy](docs/CONTEXT_STRATEGY.md)
-*   [Comparison with Codex](docs/comparison_with_codex.md)
-*   [Plugin Architecture](docs/plugin_architecture.md)
+Detailed documentation is available at [zene.dev](https://zene.dev) (or in the `www/` directory):
+
+*   [Architecture Guide](https://zene.dev/guide/architecture)
+*   [Context & Memory](https://zene.dev/guide/memory)
+*   [MCP Extensions](https://zene.dev/guide/mcp)
+*   [Technical Design Specs](https://zene.dev/design/multi-user)
+*   [Project Roadmap](https://zene.dev/roadmap)
 
 ## 🤝 Contributing
 

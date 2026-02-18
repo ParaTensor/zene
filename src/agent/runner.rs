@@ -10,18 +10,22 @@ use crate::engine::tools::ToolManager;
 use crate::config::AgentConfig;
 use crate::engine::contracts::{AgentEvent, TokenUsage};
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::Mutex;
 
 pub struct AgentRunner {
     orchestrator: Orchestrator,
 }
 
 impl AgentRunner {
-    pub fn new(config: AgentConfig, tool_manager: Arc<ToolManager>, user_interface: Box<dyn UserInterface>) -> Result<Self> {
+    pub fn new(
+        config: AgentConfig, 
+        tool_manager: Arc<ToolManager>, 
+        context_engine: Arc<Mutex<ContextEngine>>,
+        user_interface: Box<dyn UserInterface>
+    ) -> Result<Self> {
         let planner_client = AgentClient::new(&config.planner)?;
         let executor_client = AgentClient::new(&config.executor)?;
         let reflector_client = AgentClient::new(&config.reflector)?;
-        
-        let context_engine = ContextEngine::new()?;
         
         let orchestrator = Orchestrator::new(
             config,

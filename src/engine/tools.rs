@@ -10,6 +10,7 @@ use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
 use tokio::process::Command;
+use tokio::sync::Mutex;
 use tokio::time::{timeout, Duration};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -21,11 +22,12 @@ pub struct ToolDefinition {
 
 pub struct ToolManager {
     mcp_manager: Option<Arc<McpManager>>,
+    context_engine: Arc<Mutex<ContextEngine>>,
 }
 
 impl ToolManager {
-    pub fn new(mcp_manager: Option<Arc<McpManager>>) -> Self {
-        Self { mcp_manager }
+    pub fn new(mcp_manager: Option<Arc<McpManager>>, context_engine: Arc<Mutex<ContextEngine>>) -> Self {
+        Self { mcp_manager, context_engine }
     }
 
     pub async fn list_tools(&self) -> Vec<ToolDefinition> {
@@ -261,7 +263,7 @@ impl ToolManager {
          cmd_builder.push_str(python_bin.to_str().unwrap());
          cmd_builder.push(' ');
          cmd_builder.push_str(script_path);
-         
+
          for arg in args {
              cmd_builder.push(' ');
              cmd_builder.push_str(&format!("'{}'", arg));
@@ -272,7 +274,7 @@ impl ToolManager {
 
     pub fn search_code(&self, pattern: &str) -> Result<Vec<String>> {
         let root = std::env::current_dir()?;
-        let engine = ContextEngine::new()?;
+        let engine = self.context_engine.blocking_lock();
         engine.search_code(&root, pattern)
     }
 
@@ -284,7 +286,7 @@ impl ToolManager {
             root
         };
         let depth = depth.map(|d| d as usize);
-        let engine = ContextEngine::new()?;
+        let engine = self.context_engine.blocking_lock();
         Ok(engine.list_files(&target_path, depth))
     }
 

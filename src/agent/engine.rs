@@ -1,3 +1,4 @@
+use crate::engine::context::ContextEngine;
 use crate::engine::error::Result;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
@@ -15,18 +16,21 @@ use crate::engine::mcp::manager::McpManager;
 pub struct ZeneEngine {
     config: AgentConfig,
     pub tool_manager: Arc<ToolManager>,
+    context_engine: Arc<Mutex<ContextEngine>>,
     session_manager: Arc<Mutex<SessionManager>>,
 }
 
 impl ZeneEngine {
     pub async fn new(config: AgentConfig, session_store: Arc<dyn SessionStore>) -> Result<Self> {
+        let context_engine = Arc::new(Mutex::new(ContextEngine::new(config.use_semantic_memory)?));
         let mcp_manager = Arc::new(McpManager::new(config.mcp.clone()));
-        let tool_manager = Arc::new(ToolManager::new(Some(mcp_manager)));
+        let tool_manager = Arc::new(ToolManager::new(Some(mcp_manager), context_engine.clone()));
         let session_manager = Arc::new(Mutex::new(SessionManager::new(session_store).await?));
         
         Ok(Self {
             config,
             tool_manager,
+            context_engine,
             session_manager,
         })
     }
@@ -44,7 +48,12 @@ impl ZeneEngine {
         let ui = Box::new(AutoUserInterface);
 
         // 2. Setup Runner
-        let mut runner = AgentRunner::new(self.config.clone(), self.tool_manager.clone(), ui)?;
+        let mut runner = AgentRunner::new(
+            self.config.clone(), 
+            self.tool_manager.clone(), 
+            self.context_engine.clone(),
+            ui
+        )?;
         if let Some(sender) = event_sender {
             runner = runner.with_event_sender(sender);
         }

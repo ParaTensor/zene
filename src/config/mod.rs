@@ -19,6 +19,7 @@ pub struct AgentConfig {
     pub reflector: RoleConfig,
     pub mcp: McpConfig,
     pub simple_mode: bool,
+    pub use_semantic_memory: bool,
     pub xtrace_endpoint: Option<String>,
     pub xtrace_token: Option<String>,
 }
@@ -34,6 +35,10 @@ impl AgentConfig {
         let default_base_url = env::var("LLM_BASE_URL").or_else(|_| env::var("OPENAI_BASE_URL")).ok();
         
         let simple_mode = env::var("ZENE_SIMPLE_MODE")
+            .map(|v| v == "1" || v.to_lowercase() == "true")
+            .unwrap_or(false);
+
+        let use_semantic_memory = env::var("ZENE_USE_SEMANTIC_MEMORY")
             .map(|v| v == "1" || v.to_lowercase() == "true")
             .unwrap_or(false);
 
@@ -61,6 +66,7 @@ impl AgentConfig {
             reflector,
             mcp,
             simple_mode,
+            use_semantic_memory,
             xtrace_endpoint: env::var("ZENE_XTRACE_ENDPOINT").ok(),
             xtrace_token: env::var("ZENE_XTRACE_TOKEN").ok(),
         })
@@ -95,6 +101,7 @@ impl Default for AgentConfig {
             reflector: RoleConfig::default(),
             mcp: McpConfig::default(),
             simple_mode: false,
+            use_semantic_memory: false,
             xtrace_endpoint: None,
             xtrace_token: None,
         }
