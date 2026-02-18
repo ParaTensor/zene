@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2026-02-18
+
+### Changed
+- **Documentation Overhaul**: Consolidated 10 fragmented documentation files into 5 high-quality, focused guides (`ARCHITECTURE.md`, `CONTEXT.md`, `EXTENSIONS.md`, `PYTHON.md`, `ROADMAP.md`).
+- **Cleanup**: Removed redundant architecture guides, outdated roadmaps, and fragmented strategy documents.
+
 ## [0.4.1] - 2026-02-18
 
 ### Added

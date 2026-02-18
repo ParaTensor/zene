@@ -1,63 +1,50 @@
 # Zene Architecture
 
+Zene is a high-performance, headless AI coding engine designed for precision, speed, and safety.
+
 ## 1. Core Philosophy
-- **Headless Core**: The core logic is a standalone process, decoupled from any UI.
-- **Protocol First**: Communicates via standard protocols (JSON-RPC) over Stdio/HTTP.
-- **High Performance**: Rust-based, async I/O, resident daemon for instant context.
-- **Model Agnostic**: Support OpenAI, Anthropic, etc. via standard traits.
+- **Headless & Protocol-First**: Decoupled core communicating via JSON-RPC.
+- **Asynchronous & Concurrent**: Built on `tokio` for massive parallelism in tool execution.
+- **Session Isolation**: No shared global state; environment and history are scoped to individual sessions.
 
-## 2. Tech Stack (Revised)
-- **Runtime**: `tokio` (Async I/O, Task Scheduling)
-- **Communication**: `serde_json` (JSON-RPC over Stdio)
-- **LLM Client**: `llm-connector` (Unified interface for OpenAI, Anthropic, DeepSeek, etc.)
-- **Context**: `tree-sitter` (Code Analysis), `ignore` (File Walking)
-- **CLI Args**: `clap` (For launching the daemon or one-shot commands)
-- **Logging**: `tracing` (Structured logging to file/stderr)
+## 2. Agent Workflow (OODA Loop)
+Zene follows a recursive **Observe-Orient-Decide-Act** loop to solve tasks.
 
-## 3. Module Structure
-```rust
-src/
-├── main.rs          // Entry point (CLI parsing -> dispatch)
-├── server.rs        // JSON-RPC Server Loop (Stdio/Socket)
-├── api.rs           // Request/Response Definitions
-├── engine/          // Core Logic
-│   ├── mod.rs
-│   ├── context.rs   // Codebase Indexing & Retrieval (Tree-sitter)
-│   ├── tools.rs     // File I/O, Git, Command Execution
-│   └── planner.rs   // High-level Task Planning
-└── agent/           // LLM Interaction
-    ├── mod.rs
-    ├── client.rs    // LLM Client Wrapper
-    └── prompt.rs    // Dynamic Prompt Engineering
+```mermaid
+graph TD
+    User --> O1[Observe: Context Retrieval]
+    O1 --> O2[Orient: Code Analysis]
+    O2 --> D[Decide: Planning/CoT]
+    D --> A[Act: Tool Execution]
+    A --> V[Verify: Test/Result]
+    V -- Fail --> D
+    V -- Pass --> Result
 ```
+
+### The Steps:
+1. **Observe**: Analyze the project structure and semantically retrieve relevant code (RAG).
+2. **Orient**: Use `tree-sitter` to build a mental map of definitions and dependencies.
+3. **Decide**: Formulate an atomic plan using Chain of Thought.
+4. **Act**: Execute tools (Edit, Shell, Python) in isolated child processes.
+5. **Verify**: Self-correct by checking compiler output and running tests.
+
+## 3. Technical Architecture
+
+### Module Structure
+- `src/agent/`: The Brain. Orchestration, LLM interactions, and Planning.
+- `src/engine/`: The Hands. Context management, Session storage, Tool implementation.
+- `src/api/`: The Voice. JSON-RPC protocol and CLI/Server interfaces.
+
+### Concurrency & Isolation
+Zene avoids global state. All mutable data (environment variables, session history) is wrapped in `Arc<Mutex<Session>>`.
+- **Environment Management**: Variables are injected only at the child process level, preventing "Environment Pollution" in the main server.
+- **Safe Parallelism**: Independent tools are executed concurrently using `join_all`.
 
 ## 4. Operational Modes
-Zene operates in two primary modes:
+- **One-Shot CLI**: Transient execution for quick terminal tasks.
+- **Long-Running Server**: Stdio/Socket-based daemon for IDE integrations.
 
-### A. One-Shot CLI (Direct Execution)
-For quick tasks in the terminal.
-```bash
-$ zene "Refactor main.rs to use async/await"
-# Spawns a transient instance, executes the prompt, applies changes (or diffs), then exits.
-```
-
-### B. Daemon / Server Mode (Interactive)
-For IDEs or complex workflows.
-```bash
-$ zene server --stdio
-# Starts the long-running process.
-# Client sends: {"jsonrpc": "2.0", "method": "agent.run", "params": {...}}
-# Server responds: {"jsonrpc": "2.0", "result": {...}}
-```
-
-## 5. Interfaces (The "Face" of Zene)
-Since Zene is headless, it exposes its capabilities through:
-1.  **CLI**: Human-friendly wrapper around the API.
-2.  **JSON-RPC Server**: For IDEs and other tools to integrate.
-
-## 6. Data Flow (Request/Response)
-1.  **Input**: Client sends a Task (Instruction + Context).
-2.  **Analysis**: Engine analyzes codebase (Tree-sitter) to gather relevant context.
-3.  **Planning**: Agent formulates a plan (Chain of Thought).
-4.  **Execution**: Agent invokes Tools (Edit File, Run Test).
-5.  **Output**: Returns result (Diff, Message, or Error) to Client.
+## 5. Observability (xtrace)
+Automated tracing is baked into the architecture:
+- **Trace ID Propagation**: `X-Trace-Id` headers and `ZENE_TRACE_ID` environment variables link all tool activity back to the original task trace.
+- **Automated Metrics**: Token usage and span durations are captured per session without manual boilerplate.
