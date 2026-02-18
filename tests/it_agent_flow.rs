@@ -80,6 +80,8 @@ async fn test_agent_integration_flow() {
          reflector: zene::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None },
          mcp: zene::config::mcp::McpConfig::default(),
          simple_mode: false,
+         xtrace_endpoint: None,
+         xtrace_token: None,
     };
 
     // 3. Initialize Agent
@@ -96,7 +98,7 @@ async fn test_agent_integration_flow() {
     let mut runner = AgentRunner::new_with_orchestrator(orchestrator);
 
     // 4. Run Task
-    let result = runner.run("Integration Test Task", &mut session).await.unwrap();
+    let (result, _usage) = runner.run("Integration Test Task", &mut session).await.unwrap();
 
     // 5. Verify
     assert!(result.contains("Task 1: Completed"));

@@ -1,7 +1,9 @@
-use std::collections::HashMap;
+use crate::engine::context::ContextEngine;
 use crate::engine::tools::ToolManager;
 use crate::engine::ui::UserInterface;
-use crate::engine::context::ContextEngine;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub struct ToolHandler;
 
@@ -12,8 +14,8 @@ impl ToolHandler {
         tool_name: &str,
         args: &serde_json::Value,
         args_str: &str,
-        env_vars: &mut HashMap<String, String>,
-        context_engine: &mut ContextEngine,
+        env_vars_shared: Arc<Mutex<HashMap<String, String>>>,
+        context_engine_shared: Arc<Mutex<ContextEngine>>,
     ) -> String {
         // Confirmation check for sensitive tools
         if (tool_name == "run_command" || tool_name == "write_file" || tool_name == "apply_patch")
@@ -57,7 +59,8 @@ impl ToolHandler {
             }
             "run_command" => {
                 if let Some(cmd) = args.get("command").and_then(|v| v.as_str()) {
-                    match tool_manager.run_command(cmd, env_vars).await {
+                    let envs = env_vars_shared.lock().await.clone();
+                    match tool_manager.run_command(cmd, &envs).await {
                         Ok(output) => output,
                         Err(e) => format!("Error running command: {}", e),
                     }
@@ -72,7 +75,8 @@ impl ToolHandler {
                     .unwrap_or_default();
 
                 if let Some(path) = script_path {
-                     match tool_manager.run_python(path, &script_args, env_vars).await {
+                     let envs = env_vars_shared.lock().await.clone();
+                     match tool_manager.run_python(path, &script_args, &envs).await {
                          Ok(output) => output,
                          Err(e) => format!("Error running python: {}", e),
                      }
@@ -87,7 +91,7 @@ impl ToolHandler {
                     if k.len() > 100 || v.len() > 5000 {
                          "Error: key or value too large".to_string()
                     } else {
-                         env_vars.insert(k.to_string(), v.to_string());
+                         env_vars_shared.lock().await.insert(k.to_string(), v.to_string());
                          format!("Environment variable '{}' set.", k)
                     }
                 } else {
@@ -96,7 +100,7 @@ impl ToolHandler {
             }
             "get_env" => {
                 if let Some(key) = args.get("key").and_then(|v| v.as_str()) {
-                    match env_vars.get(key) {
+                    match env_vars_shared.lock().await.get(key) {
                         Some(v) => v.clone(),
                         None => "Environment variable not set".to_string(),
                     }
@@ -139,8 +143,9 @@ impl ToolHandler {
             }
             "memory_search" => {
                 if let Some(query) = args.get("query").and_then(|v| v.as_str()) {
+                    let mut context_engine = context_engine_shared.lock().await;
                     if let Some(memory) = &mut context_engine.memory {
-                        match memory.search(query, 5) {
+                        match memory.search(query, 5).await {
                             Ok(results) => {
                                 if results.is_empty() {
                                     "No relevant results found in memory.".to_string()
@@ -161,7 +166,7 @@ impl ToolHandler {
             }
             "memory_index" => {
                 let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-                match context_engine.index_project(&root) {
+                match context_engine_shared.lock().await.index_project(&root).await {
                     Ok(msg) => msg,
                     Err(e) => format!("Error indexing project: {}", e),
                 }

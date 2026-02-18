@@ -1,7 +1,8 @@
 use crate::engine::context::ContextEngine;
 use crate::engine::python_env::PythonEnv;
 use crate::engine::mcp::manager::McpManager;
-use anyhow::Result;
+use crate::engine::error::{Result, ZeneError};
+use xtrace_client::current_trace_id;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -193,8 +194,18 @@ impl ToolManager {
     }
 
     pub async fn fetch_url(&self, url: &str) -> Result<String> {
-        let response = reqwest::get(url).await?.text().await?;
-        // Optional: Convert HTML to Markdown if needed, but for now raw text
+        let mut builder = reqwest::Client::builder();
+        
+        if let Some(tid) = current_trace_id() {
+            let mut headers = reqwest::header::HeaderMap::new();
+            if let Ok(val) = reqwest::header::HeaderValue::from_str(&tid.to_string()) {
+                headers.insert("X-Trace-Id", val);
+                builder = builder.default_headers(headers);
+            }
+        }
+
+        let client = builder.build()?;
+        let response = client.get(url).send().await?.text().await?;
         Ok(response)
     }
 
@@ -205,10 +216,15 @@ impl ToolManager {
         // Timeout: 60 seconds
         let timeout_duration = Duration::from_secs(60);
 
+        let mut final_envs = envs.clone();
+        if let Some(tid) = current_trace_id() {
+            final_envs.insert("ZENE_TRACE_ID".to_string(), tid.to_string());
+        }
+
         let child = Command::new("sh")
             .arg("-c")
             .arg(command)
-            .envs(envs)
+            .envs(&final_envs)
             .stdin(Stdio::null()) // Block stdin to prevent zombie processes
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -224,9 +240,9 @@ impl ToolManager {
                     Ok(format!("Command failed with status {}:\nStdout: {}\nStderr: {}", output.status, stdout, stderr))
                 }
             },
-            Ok(Err(e)) => Err(anyhow::anyhow!("Command execution failed: {}", e)),
+            Ok(Err(e)) => Err(ZeneError::ToolError(format!("Command execution failed: {}", e))),
             Err(_) => {
-                Err(anyhow::anyhow!("Command execution timed out (limit: 60s). Note: Process might linger as we lost ownership."))
+                Err(ZeneError::ToolError("Command execution timed out (limit: 60s). Note: Process might linger as we lost ownership.".to_string()))
             }
         }
     }
@@ -295,7 +311,7 @@ impl ToolManager {
         let original_lines: Vec<&str> = original_lf.lines().collect();
         
         if original_lines.is_empty() {
-             return Err(anyhow::anyhow!("Original snippet is empty"));
+             return Err(ZeneError::InternalError("Original snippet is empty".to_string()));
         }
 
         let mut match_found = false;
@@ -347,6 +363,6 @@ impl ToolManager {
             return Ok(());
         }
 
-        Err(anyhow::anyhow!("Original snippet not found (tried exact and fuzzy match)."))
+        Err(ZeneError::InternalError("Original snippet not found (tried exact and fuzzy match).".to_string()))
     }
 }

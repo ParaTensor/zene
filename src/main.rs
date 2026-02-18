@@ -59,14 +59,26 @@ struct JsonRpcError {
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
 
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .init();
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use zene::engine::observability::init_xtrace;
 
     let config = AgentConfig::from_env().unwrap_or_else(|e| {
         error!("Failed to load config: {}. Using defaults.", e);
         AgentConfig::default()
     });
+
+    let xtrace_layer = if let (Some(endpoint), Some(token)) = (&config.xtrace_endpoint, &config.xtrace_token) {
+        init_xtrace(endpoint, token)
+    } else {
+        None
+    };
+
+    tracing_subscriber::registry()
+        .with(xtrace_layer)
+        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let storage_dir = PathBuf::from(&home).join(".zene/sessions");

@@ -13,11 +13,15 @@ pub struct Document {
     pub metadata: HashMap<String, String>,
 }
 
+use tokio::sync::Mutex;
+use std::sync::Arc;
+
+#[derive(Clone)]
 pub struct VectorStore {
-    index: Index,
-    documents: HashMap<u64, Document>,
+    index: Arc<Mutex<Index>>,
+    documents: Arc<Mutex<HashMap<u64, Document>>>,
     storage_path: PathBuf,
-    next_id: u64,
+    next_id: Arc<Mutex<u64>>,
 }
 
 impl VectorStore {
@@ -55,22 +59,26 @@ impl VectorStore {
         let next_id = documents.keys().max().copied().unwrap_or(0) + 1;
 
         Ok(Self {
-            index,
-            documents,
+            index: Arc::new(Mutex::new(index)),
+            documents: Arc::new(Mutex::new(documents)),
             storage_path: storage_path.to_path_buf(),
-            next_id,
+            next_id: Arc::new(Mutex::new(next_id)),
         })
     }
 
-    pub fn add(&mut self, embedding: Vec<f32>, path: String, content: String) -> Result<()> {
+    pub async fn add(&self, embedding: Vec<f32>, path: String, content: String) -> Result<()> {
         if embedding.len() != 384 {
             return Err(anyhow::anyhow!("Embedding dimension mismatch: expected 384, got {}", embedding.len()));
         }
 
-        let id = self.next_id;
-        self.next_id += 1;
+        let id = {
+            let mut next_id = self.next_id.lock().await;
+            let id = *next_id;
+            *next_id += 1;
+            id
+        };
 
-        self.index.add(id, &embedding)?;
+        self.index.lock().await.add(id, &embedding)?;
 
         let doc = Document {
             id,
@@ -78,24 +86,23 @@ impl VectorStore {
             content,
             metadata: HashMap::new(),
         };
-        self.documents.insert(id, doc);
+        self.documents.lock().await.insert(id, doc);
 
-        self.save()?;
+        self.save().await?;
         Ok(())
     }
 
-    pub fn search(&self, embedding: Vec<f32>, limit: usize) -> Result<Vec<(Document, f32)>> {
+    pub async fn search(&self, embedding: Vec<f32>, limit: usize) -> Result<Vec<(Document, f32)>> {
         if embedding.len() != 384 {
              return Err(anyhow::anyhow!("Embedding dimension mismatch: expected 384, got {}", embedding.len()));
         }
 
-        let results = self.index.search(&embedding, limit)?;
+        let results = self.index.lock().await.search(&embedding, limit)?;
         
         let mut docs = Vec::new();
+        let documents = self.documents.lock().await;
         for (id, distance) in results.keys.iter().zip(results.distances.iter()) {
-            if let Some(doc) = self.documents.get(id) {
-                // usearch returns distance (1 - similarity for Cosine), so lower is better.
-                // We might want to return similarity (1 - distance) if needed, but distance is fine.
+            if let Some(doc) = documents.get(id) {
                 docs.push((doc.clone(), *distance));
             }
         }
@@ -103,12 +110,13 @@ impl VectorStore {
         Ok(docs)
     }
 
-    pub fn save(&self) -> Result<()> {
+    pub async fn save(&self) -> Result<()> {
         let index_path = self.storage_path.join("index.usearch");
-        self.index.save(index_path.to_str().ok_or(anyhow::anyhow!("Invalid path"))?)?;
+        self.index.lock().await.save(index_path.to_str().ok_or(anyhow::anyhow!("Invalid path"))?)?;
 
         let docs_path = self.storage_path.join("documents.json");
-        let content = serde_json::to_string_pretty(&self.documents)?;
+        let documents = self.documents.lock().await;
+        let content = serde_json::to_string_pretty(&*documents)?;
         fs::write(docs_path, content)?;
 
         Ok(())

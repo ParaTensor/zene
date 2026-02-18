@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::engine::error::Result;
 use std::sync::Arc;
 
 use crate::agent::client::AgentClient;
@@ -8,7 +8,7 @@ use crate::engine::session::Session;
 use crate::engine::ui::UserInterface;
 use crate::engine::tools::ToolManager;
 use crate::config::AgentConfig;
-use crate::engine::contracts::AgentEvent;
+use crate::engine::contracts::{AgentEvent, TokenUsage};
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct AgentRunner {
@@ -36,7 +36,7 @@ impl AgentRunner {
         Ok(Self { orchestrator })
     }
 
-    pub async fn run(&mut self, task: &str, session: &mut Session) -> Result<String> {
+    pub async fn run(&mut self, task: &str, session: &mut Session) -> Result<(String, TokenUsage)> {
         self.orchestrator.run(task, session).await
     }
 

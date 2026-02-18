@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2026-02-18
+
+### Added
+- **Parallel Tool Execution**: Enabled concurrent execution of multiple independent tool calls in the `Executor`, significantly lowering task latency.
+- **Typed Error Hierarchy**: Migrated from `anyhow` to a structured `ZeneError` system using `thiserror` for better programmatic error handling.
+- **Advanced Observability (xtrace v0.0.13)**:
+    - Integrated `XtraceLayer` for automated span timing and metric capture.
+    - **Trace ID Propagation**: Automatic injection of Trace IDs into outbound HTTP requests (`X-Trace-Id`) and shell commands (`ZENE_TRACE_ID`) for end-to-end distributed tracing.
+- **Token Usage Aggregation**: Precise tracking and propagation of token usage across all LLM interactions in a session.
+
+### Fixed
+- **History Consistency**: Refactored `execute_task` to use mutable history references, ensuring all intermediate tool results are correctly persistent in the session.
+- **Test Stability**: Updated unit and integration tests to align with new async signatures and tuple return types.
+
 ## [0.4.0] - 2026-02-17
 
 ### Added

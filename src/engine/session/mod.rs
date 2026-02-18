@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::engine::error::Result;
 use llm_connector::types::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -81,6 +81,6 @@ impl SessionManager {
     }
 
     pub async fn save_session(&self, session: &Session) -> Result<()> {
-        self.store.save(session).await
+        self.store.save(session).await.map_err(crate::engine::error::ZeneError::from)
     }
 }

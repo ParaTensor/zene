@@ -1,12 +1,16 @@
-use anyhow::Result;
+use crate::engine::error::{Result, ZeneError};
 use ignore::WalkBuilder;
 use std::path::Path;
 use tree_sitter::{Parser, Query, QueryCursor};
 use crate::engine::memory::MemoryManager;
 
+use tokio::sync::Mutex;
+use std::sync::Arc;
+
+#[derive(Clone)]
 pub struct ContextEngine {
     #[allow(dead_code)]
-    parser: Parser,
+    parser: Arc<Mutex<Parser>>,
     pub memory: Option<MemoryManager>,
 }
 
@@ -25,7 +29,10 @@ impl ContextEngine {
             }
         };
 
-        Ok(Self { parser, memory })
+        Ok(Self { 
+            parser: Arc::new(Mutex::new(parser)), 
+            memory 
+        })
     }
 
     /// L1: Scan project structure (limited depth)
@@ -106,11 +113,13 @@ impl ContextEngine {
 
     /// L2: Analyze file for definitions (Structs, Functions)
     #[allow(dead_code)]
-    pub fn analyze_definitions(&mut self, source_code: &str) -> Result<Vec<String>> {
+    pub async fn analyze_definitions(&self, source_code: &str) -> Result<Vec<String>> {
         let tree = self
             .parser
+            .lock()
+            .await
             .parse(source_code, None)
-            .ok_or(anyhow::anyhow!("Failed to parse"))?;
+            .ok_or(ZeneError::InternalError("Failed to parse".to_string()))?;
 
         // Simple query to find function definitions
         let query_str = "(function_item name: (identifier) @function)";
@@ -127,14 +136,13 @@ impl ContextEngine {
         }
 
         Ok(definitions)
-
     }
 
-    pub fn index_project(&mut self, root: &Path) -> Result<String> {
+    pub async fn index_project(&mut self, root: &Path) -> Result<String> {
         if let Some(memory) = &mut self.memory {
-            memory.index_project(root)
+            Ok(memory.index_project(root).await?)
         } else {
-             Err(anyhow::anyhow!("Memory engine not initialized"))
+             Err(ZeneError::InternalError("Memory engine not initialized".to_string()))
         }
     }
 }

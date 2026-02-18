@@ -8,6 +8,7 @@ pub mod store;
 use embedder::Embedder;
 use store::{VectorStore, Document};
 
+#[derive(Clone)]
 pub struct MemoryManager {
     embedder: Embedder,
     store: VectorStore,
@@ -39,10 +40,10 @@ use std::fs;
 impl MemoryManager {
     // ... existing new ...
 
-    pub fn index_project(&mut self, root: &Path) -> Result<String> {
+    pub async fn index_project(&mut self, root: &Path) -> Result<String> {
         let mut count = 0;
         let walker = WalkBuilder::new(root)
-            .hidden(false) // Respect gitignore but allow hidden files? No, default is respect gitignore.
+            .hidden(false)
             .git_ignore(true)
             .build();
 
@@ -51,15 +52,13 @@ impl MemoryManager {
                 Ok(entry) => {
                     if entry.file_type().map_or(false, |ft| ft.is_file()) {
                         let path = entry.path();
-                        // Simple extension check for text files
                         if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
                             let ext = ext.to_lowercase();
                             if matches!(ext.as_str(), "rs" | "md" | "toml" | "json" | "py" | "js" | "ts" | "sh" | "html" | "css") {
                                 if let Ok(content) = fs::read_to_string(path) {
-                                    // Skip empty or too large files (>100KB) to save time/space for MVP
                                     if content.len() > 0 && content.len() < 100 * 1024 {
                                         let relative_path = path.strip_prefix(root).unwrap_or(path).to_string_lossy().to_string();
-                                        if let Err(e) = self.index_text(&content, &relative_path, None) {
+                                        if let Err(e) = self.index_text(&content, &relative_path, None).await {
                                             tracing::warn!("Failed to index {}: {}", relative_path, e);
                                         } else {
                                             count += 1;
@@ -73,18 +72,18 @@ impl MemoryManager {
                 Err(err) => tracing::warn!("Error walking directory: {}", err),
             }
         }
-        self.store.save()?; // Ensure we save to disk
+        self.store.save().await?;
         Ok(format!("Indexed {} files.", count))
     }
 
-    pub fn index_text(&mut self, text: &str, path: &str, _metadata: Option<std::collections::HashMap<String, String>>) -> Result<()> {
+    pub async fn index_text(&mut self, text: &str, path: &str, _metadata: Option<std::collections::HashMap<String, String>>) -> Result<()> {
         let embedding = self.embedder.embed_query(text)?;
-        self.store.add(embedding, path.to_string(), text.to_string())?;
+        self.store.add(embedding, path.to_string(), text.to_string()).await?;
         Ok(())
     }
 
-    pub fn search(&mut self, query: &str, limit: usize) -> Result<Vec<(Document, f32)>> {
+    pub async fn search(&mut self, query: &str, limit: usize) -> Result<Vec<(Document, f32)>> {
         let embedding = self.embedder.embed_query(query)?;
-        self.store.search(embedding, limit)
+        self.store.search(embedding, limit).await
     }
 }

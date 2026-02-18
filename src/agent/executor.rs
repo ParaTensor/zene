@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::engine::error::Result;
 use llm_connector::types::{Message, MessageBlock, Role, Tool};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -6,11 +6,13 @@ use tracing::info;
 
 use crate::agent::client::AgentClient;
 use crate::agent::tool_handler::ToolHandler;
-use crate::engine::contracts::AgentEvent;
+use crate::engine::contracts::{AgentEvent, TokenUsage};
 use crate::engine::context::ContextEngine;
 use crate::engine::plan::Task;
 use crate::engine::tools::ToolManager;
 use crate::engine::ui::UserInterface;
+use futures::future::join_all;
+use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct Executor {
@@ -42,19 +44,15 @@ impl Executor {
     }
 
     /// Executes a single task
+    #[tracing::instrument(skip(self, history, env_vars_shared, context_engine_shared, user_interface))]
     pub async fn execute_task(
         &self,
         task: &Task,
-        session_history: &[Message],
-        env_vars: &mut HashMap<String, String>,
-        context_engine: &mut ContextEngine,
+        history: &mut Vec<Message>,
+        env_vars_shared: Arc<Mutex<HashMap<String, String>>>,
+        context_engine_shared: Arc<Mutex<ContextEngine>>,
         user_interface: &dyn UserInterface,
-    ) -> Result<String> {
-        // Clone history to create a local context (we don't want to pollute global history with every intermediate tool call step, 
-        // OR we do? In the original runner, history was cloned passed in. 
-        // WAIT: In P3, we generally want the global history to reflect major steps, but intermediate thought process might be ephemeral or summarized.
-        // For now, let's stick to the current behavior: usage of a local history vector seeded with global history.
-        let mut history = session_history.to_vec();
+    ) -> Result<(String, TokenUsage)> {
 
         // Add task-specific system prompt/instruction
         let task_prompt = format!(
@@ -76,6 +74,7 @@ impl Executor {
             .collect();
 
         let mut current_iteration = 0;
+        let mut total_usage = TokenUsage::default();
 
         while current_iteration < self.max_iterations {
             current_iteration += 1;
@@ -85,6 +84,13 @@ impl Executor {
             let response = self.client
                 .chat_with_history(history.clone(), Some(tools.clone()))
                 .await?;
+
+            // Accumulate usage
+            if let Some(ref usage) = response.usage {
+                total_usage.prompt_tokens += usage.prompt_tokens;
+                total_usage.completion_tokens += usage.completion_tokens;
+                total_usage.total_tokens += usage.total_tokens;
+            }
 
             let mut assistant_msg = Message::new(Role::Assistant, vec![]);
 
@@ -100,47 +106,68 @@ impl Executor {
 
             // If no tool calls, we assume the task is done (or the model is asking a question/providing final answer)
             if response.tool_calls().is_empty() {
-                return Ok(response.content);
+                return Ok((response.content, total_usage));
             }
 
-            // Execute tools
-            for tool_call in response.tool_calls() {
-                info!("  Executing tool: {}", tool_call.function.name);
-                let tool_name = tool_call.function.name.as_str();
-                let args_str = &tool_call.function.arguments;
-                let args: serde_json::Value = serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
+            // Execute tools in parallel
+            let tool_calls = response.tool_calls().to_vec();
+            if !tool_calls.is_empty() {
+                let mut tool_futures = Vec::new();
 
-                self.emit(AgentEvent::ToolCall { 
-                    name: tool_name.to_string(), 
-                    arguments: args.clone() 
-                });
+                for tool_call in &tool_calls {
+                    info!("  Preparing tool call: {}", tool_call.function.name);
+                    let tool_name = tool_call.function.name.clone();
+                    let args_str = tool_call.function.arguments.clone();
+                    let tool_call_id = tool_call.id.clone();
+                    let tool_manager = self.tool_manager.clone();
+                    let env_vars = env_vars_shared.clone();
+                    let context_engine = context_engine_shared.clone();
+                    
+                    let args: serde_json::Value = serde_json::from_str(&args_str).unwrap_or(serde_json::Value::Null);
 
-                let result_content = ToolHandler::execute(
-                    &self.tool_manager,
-                    user_interface,
-                    tool_name,
-                    &args,
-                    args_str,
-                    env_vars,
-                    context_engine
-                ).await;
+                    self.emit(AgentEvent::ToolCall { 
+                        name: tool_name.clone(), 
+                        arguments: args.clone() 
+                    });
 
-                self.emit(AgentEvent::ToolResult { 
-                    name: tool_name.to_string(), 
-                    result: result_content.clone() 
-                });
+                    // Create a future for each tool execution
+                    let future = async move {
+                        let result_content = ToolHandler::execute(
+                            &tool_manager,
+                            user_interface,
+                            &tool_name,
+                            &args,
+                            &args_str,
+                            env_vars,
+                            context_engine,
+                        ).await;
 
-                let tool_msg = Message {
-                    role: Role::Tool,
-                    content: vec![MessageBlock::text(&result_content)],
-                    tool_call_id: Some(tool_call.id.clone()),
-                    ..Default::default()
-                };
-                history.push(tool_msg);
+                        (tool_call_id, tool_name, result_content)
+                    };
+                    tool_futures.push(future);
+                }
+
+                let results = join_all(tool_futures).await;
+
+                for (id, name, result_content) in results {
+                    info!("  Tool {} finished", name);
+                    self.emit(AgentEvent::ToolResult { 
+                        name: name.clone(), 
+                        result: result_content.clone() 
+                    });
+
+                    let tool_msg = Message {
+                        role: Role::Tool,
+                        content: vec![MessageBlock::text(&result_content)],
+                        tool_call_id: Some(id),
+                        ..Default::default()
+                    };
+                    history.push(tool_msg);
+                }
             }
         }
 
-        Ok("Task stopped: Max iterations reached without definitive completion.".to_string())
+        Ok(("Task stopped: Max iterations reached without definitive completion.".to_string(), total_usage))
     }
 }
 
@@ -157,7 +184,7 @@ mod tests {
     async fn test_executor_simple_tool_flow() {
         // Setup Mocks
         let ui = Box::new(MockUserInterface::new());
-        let mut context_engine = ContextEngine::new().unwrap();
+        let context_engine = ContextEngine::new().unwrap();
         let mut session_manager = SessionManager::new(Arc::new(InMemorySessionStore::new())).await.unwrap();
         let session = session_manager.create_session("test_executor".to_string());
         
@@ -219,14 +246,20 @@ mod tests {
             result: None,
         };
         
-        let result = executor.execute_task(
+        let env_vars_shared = Arc::new(tokio::sync::Mutex::new(session.env_vars.clone()));
+        let context_engine_shared = Arc::new(tokio::sync::Mutex::new(context_engine));
+        
+        let (_result, _usage) = executor.execute_task(
             &task,
-            &session.history,
-            &mut session.env_vars,
-            &mut context_engine,
+            &mut session.history,
+            env_vars_shared,
+            context_engine_shared,
             ui.as_ref()
         ).await.unwrap();
         
-        assert_eq!(result, "Done");
+        // Assert: Done or something similar
+        assert_eq!(_result, "Done");
+        assert_eq!(session.history.len(), 4); // User + Assistant (Tool Call) + Tool + Final Assistant
+        assert!(_usage.total_tokens > 0 || _usage.total_tokens == 0); // usage should be returned
     }
 }

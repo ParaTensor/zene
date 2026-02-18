@@ -1,6 +1,5 @@
 use anyhow::Result;
 use zene::engine::context::ContextEngine;
-use std::path::Path;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -12,12 +11,12 @@ async fn main() -> Result<()> {
 
     println!("Indexing current project (this might take a moment)...");
     let root = std::env::current_dir()?;
-    let result = context_engine.index_project(&root)?;
+    let result = context_engine.index_project(&root).await?;
     println!("Indexing Result: {}", result);
 
     println!("\nPerforming Memory Search for 'memory implementation'...");
     if let Some(memory) = &mut context_engine.memory {
-        let results = memory.search("memory implementation", 3)?;
+        let results = memory.search("memory implementation", 3).await?;
         for (doc, score) in results {
             println!("\n[Score: {:.4}] File: {}", 1.0 - score, doc.path);
             let snippet: String = doc.content.chars().take(100).collect();
@@ -29,7 +28,7 @@ async fn main() -> Result<()> {
 
     println!("\nPerforming Memory Search for 'agent runner loop'...");
     if let Some(memory) = &mut context_engine.memory {
-        let results = memory.search("agent runner loop", 3)?;
+        let results = memory.search("agent runner loop", 3).await?;
         for (doc, score) in results {
             println!("\n[Score: {:.4}] File: {}", 1.0 - score, doc.path);
             let snippet: String = doc.content.chars().take(100).collect();

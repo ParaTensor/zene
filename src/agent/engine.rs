@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::engine::error::Result;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 use tracing::error;
@@ -23,7 +23,7 @@ impl ZeneEngine {
         let mcp_manager = Arc::new(McpManager::new(config.mcp.clone()));
         let tool_manager = Arc::new(ToolManager::new(Some(mcp_manager)));
         let session_manager = Arc::new(Mutex::new(SessionManager::new(session_store).await?));
-
+        
         Ok(Self {
             config,
             tool_manager,
@@ -62,7 +62,7 @@ impl ZeneEngine {
         
         // 4. Run Task
         let mut session = session_clone;
-        let output = runner.run(&request.prompt, &mut session).await?;
+        let (output, usage) = runner.run(&request.prompt, &mut session).await?;
 
         // 5. Save Session
         {
@@ -75,7 +75,7 @@ impl ZeneEngine {
         Ok(RunResult {
             output,
             session_id: request.session_id,
-            usage: TokenUsage::default(), // TODO: Track actual usage
+            usage,
         })
     }
 }

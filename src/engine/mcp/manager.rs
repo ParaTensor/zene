@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::engine::error::{Result, ZeneError};
 use crate::config::mcp::McpConfig;
 use crate::engine::tools::ToolDefinition;
 use zene_mcp::McpClient;
@@ -69,7 +69,7 @@ impl McpManager {
         // Parse "server__tool" format
         let parts: Vec<&str> = name.splitn(2, "__").collect();
         if parts.len() != 2 {
-            return Err(anyhow::anyhow!("Invalid MCP tool name: {}. Expected format: server__tool", name));
+            return Err(ZeneError::McpError(format!("Invalid MCP tool name: {}. Expected format: server__tool", name)));
         }
 
         let server_name = parts[0];
@@ -82,7 +82,7 @@ impl McpManager {
             // Assuming simple text response for MVP, use Debug formatting as fail-safe
              Ok(format!("{:?}", result))
         } else {
-            Err(anyhow::anyhow!("MCP Server not found: {}", server_name))
+            Err(ZeneError::McpError(format!("MCP Server not found: {}", server_name)))
         }
     }
 }

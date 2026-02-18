@@ -19,6 +19,8 @@ pub struct AgentConfig {
     pub reflector: RoleConfig,
     pub mcp: McpConfig,
     pub simple_mode: bool,
+    pub xtrace_endpoint: Option<String>,
+    pub xtrace_token: Option<String>,
 }
 
 impl AgentConfig {
@@ -59,6 +61,8 @@ impl AgentConfig {
             reflector,
             mcp,
             simple_mode,
+            xtrace_endpoint: env::var("ZENE_XTRACE_ENDPOINT").ok(),
+            xtrace_token: env::var("ZENE_XTRACE_TOKEN").ok(),
         })
     }
 
@@ -91,6 +95,8 @@ impl Default for AgentConfig {
             reflector: RoleConfig::default(),
             mcp: McpConfig::default(),
             simple_mode: false,
+            xtrace_endpoint: None,
+            xtrace_token: None,
         }
     }
 }

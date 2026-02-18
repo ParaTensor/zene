@@ -1,6 +1,6 @@
 [package]
 name = "zene"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "A minimalist, high-performance multi-agent coding engine written in Rust."
 license = "MIT"
@@ -22,6 +22,7 @@ exclude = [
 tokio = { version = "1.36", features = ["full"] }
 anyhow = "1.0"
 thiserror = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
 
 # CLI & Configuration
 clap = { version = "4.5", features = ["derive"] }
@@ -47,6 +48,7 @@ tree-sitter-rust = "0.20"
 tree-sitter-typescript = "0.20"
 ignore = "0.4" # For file walking respecting .gitignore
 grep = "0.2"   # For searching text patterns
+grep-regex = "0.1"
 walkdir = "2.3" # For directory traversal (if needed, but ignore is better)
 zene-mcp = "0.1.0"
 toml = "1.0.2"
@@ -54,6 +56,8 @@ fastembed = "5.9.0"
 usearch = "2.24.0"
 md5 = "0.8.0"
 async-trait = "0.1.89"
+futures = "0.3"
+xtrace-client = { path = "../xtrace/crates/xtrace-client", features = ["tracing"] }
 
 # Optional: For future MCP or LSP implementation
 # tower-lsp = "0.20" 

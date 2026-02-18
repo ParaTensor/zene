@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::engine::error::{Result, ZeneError};
 use llm_connector::{
     types::{ChatRequest, ChatResponse, Message, Tool, ToolChoice},
     LlmClient,
@@ -40,7 +40,7 @@ impl AgentClient {
                     "https://api.minimaxi.com/v1"
                 )?,
                 "ollama" => LlmClient::ollama()?,
-                _ => return Err(anyhow::anyhow!("Unsupported provider: {}", config.provider)),
+                _ => return Err(ZeneError::ConfigError(format!("Unsupported provider: {}", config.provider))),
             }
         };
 

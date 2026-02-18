@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::engine::error::Result;
 use tracing::{info, warn};
 use std::sync::Arc;
 
@@ -13,7 +13,7 @@ use crate::engine::session::Session;
 use crate::engine::tools::ToolManager;
 use crate::engine::ui::UserInterface;
 use crate::config::AgentConfig;
-use crate::engine::contracts::AgentEvent;
+use crate::engine::contracts::{AgentEvent, TokenUsage};
 use llm_connector::types::Message;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -67,7 +67,9 @@ impl Orchestrator {
         }
     }
 
-    pub async fn run(&mut self, goal: &str, session: &mut Session) -> Result<String> {
+    #[tracing::instrument(skip(self, session), fields(session_id = %session.id))]
+    pub async fn run(&mut self, goal: &str, session: &mut Session) -> Result<(String, TokenUsage)> {
+        let mut total_usage = TokenUsage::default();
         // Step 1: Planning
         if !self.config.simple_mode && session.plan.is_none() {
             self.emit(AgentEvent::PlanningStarted);
@@ -116,19 +118,64 @@ impl Orchestrator {
                     current_task.id, current_task.description
                  )));
 
-                 // Execute
+                 // Execute in parallel
+                 let env_vars_shared = Arc::new(tokio::sync::Mutex::new(session.env_vars.clone()));
+                 let context_engine_shared = Arc::new(tokio::sync::Mutex::new(self.context_engine.clone()));
+                 let start_time = std::time::Instant::now();
                  let result = self.executor.execute_task(
                      current_task,
-                     &session.history,
-                     &mut session.env_vars,
-                     &mut self.context_engine,
+                     &mut session.history,
+                     env_vars_shared.clone(),
+                     context_engine_shared.clone(),
                      self.user_interface.as_ref()
                  ).await;
+                 let duration = start_time.elapsed();
+
+                 // Sync back updates
+                 session.env_vars = Arc::try_unwrap(env_vars_shared)
+                     .map_err(|_| "Failed to unwrap env_vars_shared")
+                     .unwrap()
+                     .into_inner();
+                 self.context_engine = Arc::try_unwrap(context_engine_shared)
+                     .map_err(|_| "Failed to unwrap context_engine_shared")
+                     .unwrap()
+                     .into_inner();
 
                  match result {
-                     Ok(output) => {
-                         info!("Orchestrator: Task {} Execution Finished", current_task.id);
+                     Ok((output, usage)) => {
+                         info!("Orchestrator: Task {} Execution Finished. Usage: {:?}", current_task.id, usage);
                          current_task.result = Some(output.clone());
+
+                         // Accumulate session usage
+                         total_usage.prompt_tokens += usage.prompt_tokens;
+                         total_usage.completion_tokens += usage.completion_tokens;
+                         total_usage.total_tokens += usage.total_tokens;
+
+                          // Report metrics via tracing
+                          tracing::info!(
+                              metric = "zene_task_latency",
+                              value = duration.as_secs_f64(),
+                              task_id = current_task.id.to_string(),
+                              agent_role = "Orchestrator",
+                          );
+                          tracing::info!(
+                              metric = "zene_prompt_tokens",
+                              value = usage.prompt_tokens as f64,
+                              task_id = current_task.id.to_string(),
+                              agent_role = "Orchestrator",
+                          );
+                          tracing::info!(
+                              metric = "zene_completion_tokens",
+                              value = usage.completion_tokens as f64,
+                              task_id = current_task.id.to_string(),
+                              agent_role = "Orchestrator",
+                          );
+                          tracing::info!(
+                              metric = "zene_total_tokens",
+                              value = usage.total_tokens as f64,
+                              task_id = current_task.id.to_string(),
+                              agent_role = "Orchestrator",
+                          );
                          
                          // Update history with result
                          session.history.push(Message::system(&format!(
@@ -183,7 +230,7 @@ impl Orchestrator {
                             "Task '{}' failed with error: {}", 
                             current_task.description, e
                          )));
-                         return Ok(format!("Execution halted due to task failure: {}", e));
+                         return Ok((format!("Execution halted due to task failure: {}", e), total_usage));
                      }
                  }
 
@@ -197,10 +244,10 @@ impl Orchestrator {
              
              if final_summary.is_empty() {
                  self.emit(AgentEvent::Finished("Plan completed".to_string()));
-                 return Ok("Plan completed (or explicit empty plan).".to_string());
+                 return Ok(("Plan completed (or explicit empty plan).".to_string(), total_usage));
              }
              self.emit(AgentEvent::Finished(final_summary.clone()));
-             return Ok(final_summary);
+             return Ok((final_summary, total_usage));
         } else {
             // No plan (Simple Mode or Planning failed) - Execute as single ad-hoc task
             // We can wrap the goal in a generic task
@@ -211,15 +258,59 @@ impl Orchestrator {
                  result: None,
              };
              
+             // Execute in parallel
+             let start_time = std::time::Instant::now();
+             let env_vars_shared = Arc::new(tokio::sync::Mutex::new(session.env_vars.clone()));
+             let context_engine_shared = Arc::new(tokio::sync::Mutex::new(self.context_engine.clone()));
+             
              let result = self.executor.execute_task(
                  &adhoc_task, 
-                 &session.history, 
-                 &mut session.env_vars, 
-                 &mut self.context_engine, 
+                 &mut session.history, 
+                 env_vars_shared.clone(), 
+                 context_engine_shared.clone(),
                  self.user_interface.as_ref()
              ).await?;
+             let duration = start_time.elapsed();
              
-             return Ok(result);
+             let (output, usage) = result;
+
+             // Report metrics via tracing
+             tracing::info!(
+                 metric = "zene_task_latency",
+                 value = duration.as_secs_f64(),
+                 session_id = "adhoc",
+                 agent_role = "Orchestrator",
+             );
+             tracing::info!(
+                 metric = "zene_prompt_tokens",
+                 value = usage.prompt_tokens as f64,
+                 session_id = "adhoc",
+                 agent_role = "Orchestrator",
+             );
+             tracing::info!(
+                 metric = "zene_completion_tokens",
+                 value = usage.completion_tokens as f64,
+                 session_id = "adhoc",
+                 agent_role = "Orchestrator",
+             );
+             tracing::info!(
+                 metric = "zene_total_tokens",
+                 value = usage.total_tokens as f64,
+                 session_id = "adhoc",
+                 agent_role = "Orchestrator",
+             );
+
+             // Sync back updates
+             session.env_vars = Arc::try_unwrap(env_vars_shared)
+                 .map_err(|_| "Failed to unwrap env_vars_shared")
+                 .unwrap()
+                 .into_inner();
+             self.context_engine = Arc::try_unwrap(context_engine_shared)
+                 .map_err(|_| "Failed to unwrap context_engine_shared")
+                 .unwrap()
+                 .into_inner();
+             
+             return Ok((output, usage));
         }
     }
 }
@@ -230,7 +321,7 @@ mod tests {
     use crate::testing::MockUserInterface;
     use crate::engine::session::SessionManager;
     use crate::engine::session::store::InMemorySessionStore;
-    use crate::config::{AgentConfig, RoleConfig};
+    use crate::config::AgentConfig;
     use llm_connector::types::ChatResponse;
 
     #[tokio::test]
@@ -249,6 +340,8 @@ mod tests {
              reflector: crate::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None },
              mcp: crate::config::mcp::McpConfig::default(),
              simple_mode: false,
+             xtrace_endpoint: None,
+             xtrace_token: None,
         };
 
         // 1. Planner Mock: Returns a plan with 1 task
@@ -318,7 +411,7 @@ mod tests {
             ui,
         );
 
-        let result = orchestrator.run("Do something", &mut session).await.unwrap();
+        let (result, _usage) = orchestrator.run("Test Task", &mut session).await.unwrap();
         
         assert!(result.contains("Task 1: Completed"));
         assert!(session.plan.is_some());
