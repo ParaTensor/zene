@@ -57,7 +57,7 @@ usearch = "2.24.0"
 md5 = "0.8.0"
 async-trait = "0.1.89"
 futures = "0.3"
-xtrace-client = { path = "../xtrace/crates/xtrace-client", features = ["tracing"] }
+xtrace-client = { version = "0.0.13", path = "../xtrace/crates/xtrace-client", features = ["tracing"] }
 
 # Optional: For future MCP or LSP implementation
 # tower-lsp = "0.20" 
