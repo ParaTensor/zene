@@ -42,6 +42,7 @@ export default defineConfig({
           items: [
             { text: 'What is Zene?', link: '/guide/what-is-zene' },
             { text: 'Getting Started', link: '/guide/getting-started' },
+            { text: 'How to Call Zene', link: '/guide/integration' },
             { text: 'Architecture', link: '/guide/architecture' }
           ]
         },
@@ -66,9 +67,9 @@ export default defineConfig({
         {
           text: 'Design Specs',
           items: [
-            { text: 'Multi-User Service', link: '/design/multi-user' },
-            { text: 'Warm Pool', link: '/design/warm-pool' },
-            { text: 'Spawn vs Daemon', link: '/design/spawn-vs-daemon' }
+            { text: 'Multi-User Service', link: '/guide/design/multi-user' },
+            { text: 'Warm Pool', link: '/guide/design/warm-pool' },
+            { text: 'Spawn vs Daemon', link: '/guide/design/spawn-vs-daemon' }
           ]
         }
       ],

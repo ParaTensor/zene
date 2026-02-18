@@ -109,7 +109,7 @@ Detailed documentation is available at [zene.dev](https://zene.dev) (or in the `
 *   [Architecture Guide](https://zene.dev/guide/architecture)
 *   [Context & Memory](https://zene.dev/guide/memory)
 *   [MCP Extensions](https://zene.dev/guide/mcp)
-*   [Technical Design Specs](https://zene.dev/design/multi-user)
+*   [Technical Design Specs](https://zene.dev/guide/design/multi-user)
 *   [Project Roadmap](https://zene.dev/roadmap)
 
 ## 🤝 Contributing
