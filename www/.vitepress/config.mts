@@ -28,7 +28,7 @@ export default defineConfig({
       { text: 'Blog', link: '/blog/' },
       { text: 'Examples', link: '/examples/' },
       {
-        text: 'v0.3.1', items: [
+        text: 'v0.4.3', items: [
           { text: 'Changelog', link: 'https://github.com/lipish/zene/blob/main/CHANGELOG.md' },
           { text: 'Contributing', link: 'https://github.com/lipish/zene/blob/main/CONTRIBUTING.md' }
         ]

@@ -45,4 +45,4 @@ export ZENE_USE_SEMANTIC_MEMORY=true
 ## Dynamic Management
 - **Smart Pruning**: Automatically removes AST nodes unrelated to the current task.
 - **Token Monitoring**: Real-time counting and summarization.
-- **Relevance Ranking**: Retreived snippets are sorted by importance.
+- **Relevance Ranking**: Retrieved snippets are sorted by importance.
