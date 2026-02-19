@@ -39,15 +39,13 @@ cargo build --release
 ## 🛠️ Usage
 
 ### 1. Set Environment Variables
-Zene prioritizes DeepSeek but supports OpenAI as a fallback. Semantic memory (RAG) is optional to keep baseline memory low (~200MB savings).
+Zene prioritizes DeepSeek but supports OpenAI as a fallback. 
+
+### 2. High-Performance Knowledge (Opt-in)
+To enable Tier 3 Semantic Memory (RAG), you must compile Zene with the `knowledge` feature:
 
 ```bash
-# API Keys
-export DEEPSEEK_API_KEY="sk-..."
-export OPENAI_API_KEY="sk-..."
-
-# Optional: Enable Semantic Memory (RAG)
-# Default is false. When false, fastembed models are not loaded.
+cargo build --release --features knowledge
 export ZENE_USE_SEMANTIC_MEMORY=true
 ```
 

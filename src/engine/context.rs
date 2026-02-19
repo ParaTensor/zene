@@ -2,6 +2,7 @@ use crate::engine::error::{Result, ZeneError};
 use ignore::WalkBuilder;
 use std::path::Path;
 use tree_sitter::{Parser, Query, QueryCursor};
+#[cfg(feature = "knowledge")]
 use crate::engine::memory::MemoryManager;
 
 use tokio::sync::Mutex;
@@ -11,15 +12,18 @@ use std::sync::Arc;
 pub struct ContextEngine {
     #[allow(dead_code)]
     parser: Arc<Mutex<Parser>>,
+    #[cfg(feature = "knowledge")]
     pub memory: Option<MemoryManager>,
 }
 
 impl ContextEngine {
     pub fn new(use_memory: bool) -> Result<Self> {
+        let _ = use_memory;
         let mut parser = Parser::new();
         // Default to Rust for now, in reality we'd swap languages dynamically
         parser.set_language(tree_sitter_rust::language())?;
         
+        #[cfg(feature = "knowledge")]
         let memory = if use_memory {
             let root = std::env::current_dir()?;
             match MemoryManager::new(&root) {
@@ -35,6 +39,7 @@ impl ContextEngine {
 
         Ok(Self { 
             parser: Arc::new(Mutex::new(parser)), 
+            #[cfg(feature = "knowledge")]
             memory 
         })
     }
@@ -142,12 +147,13 @@ impl ContextEngine {
         Ok(definitions)
     }
 
-    pub async fn index_project(&mut self, root: &Path) -> Result<String> {
+    pub async fn index_project(&mut self, _root: &Path) -> Result<String> {
+        #[cfg(feature = "knowledge")]
         if let Some(memory) = &mut self.memory {
-            Ok(memory.index_project(root).await?)
-        } else {
-             Err(ZeneError::InternalError("Memory engine not initialized".to_string()))
+            return Ok(memory.index_project(_root).await?);
         }
+        
+        Err(ZeneError::InternalError("Memory engine not initialized or disabled at compile time".to_string()))
     }
 }
 

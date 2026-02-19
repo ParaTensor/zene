@@ -17,6 +17,7 @@ impl ToolHandler {
         env_vars_shared: Arc<Mutex<HashMap<String, String>>>,
         context_engine_shared: Arc<Mutex<ContextEngine>>,
     ) -> String {
+        let _ = context_engine_shared;
         // Confirmation check for sensitive tools
         if (tool_name == "run_command" || tool_name == "write_file" || tool_name == "apply_patch")
             && !user_interface.confirm_execution(tool_name, args_str)
@@ -141,6 +142,7 @@ impl ToolHandler {
                     "Error: Missing arguments (path, original_snippet, new_snippet)".to_string()
                 }
             }
+            #[cfg(feature = "knowledge")]
             "memory_search" => {
                 if let Some(query) = args.get("query").and_then(|v| v.as_str()) {
                     let mut context_engine = context_engine_shared.lock().await;
@@ -164,6 +166,7 @@ impl ToolHandler {
                     "Error: Missing query argument".to_string()
                 }
             }
+            #[cfg(feature = "knowledge")]
             "memory_index" => {
                 let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
                 match context_engine_shared.lock().await.index_project(&root).await {

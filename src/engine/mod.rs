@@ -5,6 +5,7 @@ pub mod session;
 pub mod plan;
 pub mod python_env;
 pub mod mcp;
+#[cfg(feature = "knowledge")]
 pub mod memory;
 pub mod contracts;
 pub mod error;

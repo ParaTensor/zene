@@ -34,9 +34,15 @@ Context is loaded dynamically based on task depth to save tokens and improve acc
 
 ## Performance & Opt-in
 
-By default, Zene aims for a minimalist footprint. Semantic memory requires loading transformer models which consume significant memory.
+By default, Zene aims for a minimalist footprint. Semantic memory requires loading transformer models which consume significant memory. 
 
-To enable Tier 3 Vector Search, set the following environment variable:
+> [!IMPORTANT]
+> Tier 3 Semantic Memory is a **compile-time feature**. You must enable it during `cargo build` to include the necessary dependencies:
+> ```bash
+> cargo build --release --features knowledge
+> ```
+
+Once compiled with the feature, you can activate it at runtime:
 
 ```bash
 export ZENE_USE_SEMANTIC_MEMORY=true
