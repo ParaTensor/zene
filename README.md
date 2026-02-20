@@ -10,7 +10,7 @@
 [![Build Status](https://github.com/lipish/zene/actions/workflows/release.yml/badge.svg)](https://github.com/lipish/zene/actions)
 [![License](https://img.shields.io/crates/l/zene.svg)](https://github.com/lipish/zene/blob/main/LICENSE)
 
-[Installation](#installation) • [Usage](#usage) • [Documentation](https://zene.dev) • [Contributing](#contributing)
+[Installation](#installation) • [Usage](#usage) • [Documentation](https://zene.run) • [Contributing](#contributing)
 
 <img src="https://zene.run/images/demo-terminal.svg" alt="Zene Terminal Demo" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);" />
 
@@ -100,12 +100,12 @@ Sessions are automatically persisted to `~/.zene/sessions/<session_id>.json`.
 
 ## Documentation
 
-Detailed documentation is available at [zene.dev](https://zene.dev) (or in the `www/` directory):
+Detailed documentation is available at [zene.run](https://zene.run) (or in the `www/` directory):
 
-*   [Architecture Guide](https://zene.dev/guide/architecture)
-*   [Context & Memory](https://zene.dev/guide/memory)
-*   [Technical Design Specs](https://zene.dev/guide/design/multi-user)
-*   [Project Roadmap](https://zene.dev/roadmap)
+*   [Architecture Guide](https://zene.run/guide/architecture)
+*   [Context & Memory](https://zene.run/guide/memory)
+*   [Technical Design Specs](https://zene.run/guide/design/multi-user)
+*   [Project Roadmap](https://zene.run/roadmap)
 
 ## Contributing
 
