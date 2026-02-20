@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    name: Build and Release
+  build:
+    name: Build
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -39,6 +39,7 @@ jobs:
 
       - name: Package (Linux/macOS)
         if: matrix.os != 'windows-latest'
+        shell: bash
         run: |
           cd target/${{ matrix.target }}/release
           tar -czf ../../../${{ matrix.name }}.tar.gz zene
@@ -46,16 +47,43 @@ jobs:
 
       - name: Package (Windows)
         if: matrix.os == 'windows-latest'
+        shell: pwsh
         run: |
           cd target/${{ matrix.target }}/release
           7z a ../../../${{ matrix.name }}.zip zene.exe
           cd -
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            ${{ matrix.name }}.tar.gz
+            ${{ matrix.name }}.zip
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            ${{ matrix.name }}.tar.gz
-            ${{ matrix.name }}.zip
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
           generate_release_notes: true
+          fail_on_unmatched_files: true

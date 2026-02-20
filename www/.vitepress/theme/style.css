@@ -104,19 +104,34 @@
   background-color: #0d1117 !important;
 }
 
-/* 导航栏 */
+/* 导航栏修复 */
 .VPNavBar {
-  border-bottom: 1px solid var(--vp-c-border) !important;
-  /* 移除强制背景色 */
+  /* 使用 box-shadow 代替 border-bottom，避免被子元素遮挡 */
+  border-bottom: none !important;
+  box-shadow: 0 1px 0 0 var(--vp-c-brand-2) !important;
+  /* 提高层级，防止被内容遮挡 */
+  z-index: 60 !important; 
 }
+
 /* Dark Mode 下导航栏背景 */
 .dark .VPNavBar {
-  background-color: rgba(11, 12, 12, 0.9) !important;
-  border-bottom: 1px solid var(--vp-c-brand-2) !important;
+  background-color: rgba(11, 12, 12, 0.95) !important; /* 增加不透明度 */
 }
 
 /* Light Mode 下导航栏背景 */
 html:not(.dark) .VPNavBar {
-  background-color: rgba(255, 255, 255, 0.9) !important;
-  border-bottom: 1px solid var(--vp-c-brand-2) !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* 修复 Search 组件跳动问题 */
+/* 强制给 Search 组件一个稳定的容器环境 */
+.VPNavBarSearch {
+  /* 确保搜索框不会因为 flex 挤压而变形 */
+  flex-shrink: 0;
+}
+
+/* 针对不同页面的 Layout 稳定性 */
+.VPNavBar .content {
+  /* 保持内容垂直居中 */
+  align-items: center;
 }
