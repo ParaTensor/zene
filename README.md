@@ -1,10 +1,22 @@
+<div align="center">
+
 # Zene
 
-> A minimalist, high-performance AI coding engine written in Rust.
+<img src="https://zene.run/images/demo-terminal.svg" alt="Zene Terminal Demo" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);" />
 
-**Zene** is a headless AI coding agent designed to understand your codebase and execute complex programming tasks. It acts as an intelligent backend that can be integrated into CLI tools, IDEs, or other agentic workflows via standard JSON-RPC.
+**A Minimalist, High-Performance AI Coding Engine**
 
-## � Philosophy
+[![Crates.io](https://img.shields.io/crates/v/zene.svg)](https://crates.io/crates/zene)
+[![Build Status](https://github.com/lipish/zene/actions/workflows/release.yml/badge.svg)](https://github.com/lipish/zene/actions)
+[![License](https://img.shields.io/crates/l/zene.svg)](https://github.com/lipish/zene/blob/main/LICENSE)
+
+[Installation](#installation) • [Usage](#usage) • [Documentation](https://zene.dev) • [Contributing](#contributing)
+
+</div>
+
+---
+
+## Philosophy
 
 **Zene** combines **"Zen"** and **"Engine"**.
 
@@ -16,7 +28,7 @@ We believe in:
 *   **Explicit Configuration**: No magic, just standard environment variables.
 *   **Agentic Composition**: Specialized roles (Planner, Executor, Reflector) working in harmony.
 
-## �🚀 Key Features
+## Key Features
 
 *   **Model Agnostic**: Built on `llm-connector`, supporting OpenAI, Anthropic, DeepSeek, Google Gemini, and more.
 *   **Context Aware**: Uses `tree-sitter` for syntax-level code analysis and efficient file walking to understand project structure.
@@ -24,10 +36,15 @@ We believe in:
 *   **JSON-RPC Server**: Functions as a standard server, exposing its capabilities to IDEs and other tools.
 *   **Blazing Fast**: Written in pure Rust with async I/O.
 
-## 📦 Installation
+## Installation
 
-### Prerequisites
-*   Rust toolchain (cargo)
+### Pre-built Binaries
+Download the latest release for your platform from the [Releases Page](https://github.com/lipish/zene/releases).
+
+### From Crates.io
+```bash
+cargo install zene
+```
 
 ### Build from Source
 ```bash
@@ -36,38 +53,30 @@ cd zene
 cargo build --release
 ```
 
-## 🛠️ Usage
+## Usage
 
 ### 1. Set Environment Variables
-Zene prioritizes DeepSeek but supports OpenAI as a fallback. 
-
-### 2. High-Performance Knowledge (Opt-in)
-To enable Tier 3 Semantic Memory (RAG), you must compile Zene with the `knowledge` feature:
-
-```bash
-cargo build --release --features knowledge
-export ZENE_USE_SEMANTIC_MEMORY=true
-```
+Zene prioritizes DeepSeek but supports OpenAI as a fallback.
 
 ### 2. Run a Task (One-Shot)
 Execute a single instruction directly from the command line.
 
 ```bash
 # Create a file
-cargo run -- run "Create a hello.txt with content 'Hello Zene'"
+zene run "Create a hello.txt with content 'Hello Zene'"
 
 # Refactor code (Context aware)
-cargo run -- run "Refactor src/main.rs to extract the CLI logic into a separate module"
+zene run "Refactor src/main.rs to extract the CLI logic into a separate module"
 
 # Fetch Web Content
-cargo run -- run "Fetch https://example.com and summarize it in README.md"
+zene run "Fetch https://example.com and summarize it in README.md"
 ```
 
 ### 3. Server Mode
 Start Zene as a JSON-RPC server (over Stdio). This mode supports persistent sessions and multi-turn conversations.
 
 ```bash
-cargo run -- server
+zene server
 ```
 
 #### JSON-RPC API Example
@@ -85,35 +94,21 @@ cargo run -- server
 }
 ```
 
-**Request (Follow-up):**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "agent.run",
-  "params": {
-    "instruction": "Based on that, generate a README",
-    "session_id": "my-session-001"
-  },
-  "id": 2
-}
-```
-
 Sessions are automatically persisted to `~/.zene/sessions/<session_id>.json`.
 
-## 📚 Documentation
+## Documentation
 
 Detailed documentation is available at [zene.dev](https://zene.dev) (or in the `www/` directory):
 
 *   [Architecture Guide](https://zene.dev/guide/architecture)
 *   [Context & Memory](https://zene.dev/guide/memory)
-*   [MCP Extensions](https://zene.dev/guide/mcp)
 *   [Technical Design Specs](https://zene.dev/guide/design/multi-user)
 *   [Project Roadmap](https://zene.dev/roadmap)
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please read our architecture documentation to understand the core philosophy before submitting PRs.
 
-## 📄 License
+## License
 
 MIT
