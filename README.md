@@ -2,15 +2,17 @@
 
 # Zene
 
-<img src="https://zene.run/images/demo-terminal.svg" alt="Zene Terminal Demo" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);" />
 
-**A Minimalist, High-Performance AI Coding Engine**
+
+**A High-Performance Multi-Agent Coding Engine with Autonomous Planning and Reflection**
 
 [![Crates.io](https://img.shields.io/crates/v/zene.svg)](https://crates.io/crates/zene)
 [![Build Status](https://github.com/lipish/zene/actions/workflows/release.yml/badge.svg)](https://github.com/lipish/zene/actions)
 [![License](https://img.shields.io/crates/l/zene.svg)](https://github.com/lipish/zene/blob/main/LICENSE)
 
 [Installation](#installation) • [Usage](#usage) • [Documentation](https://zene.dev) • [Contributing](#contributing)
+
+<img src="https://zene.run/images/demo-terminal.svg" alt="Zene Terminal Demo" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);" />
 
 </div>
 
