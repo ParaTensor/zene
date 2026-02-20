@@ -58,3 +58,4 @@ node_modules/
 dist/
 .fastembed_cache/
 temp_workspace/
+zene_config.toml
