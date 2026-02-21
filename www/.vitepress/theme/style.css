@@ -106,11 +106,24 @@
 
 /* 导航栏修复 */
 .VPNavBar {
-  /* 使用 box-shadow 代替 border-bottom，避免被子元素遮挡 */
+  /* 不在 NavBar 自身画下边线，避免被不同页面布局遮挡 */
   border-bottom: none !important;
-  box-shadow: 0 1px 0 0 var(--vp-c-brand-2) !important;
+  box-shadow: none !important;
   /* 提高层级，防止被内容遮挡 */
   z-index: 60 !important; 
+}
+
+/* 在导航栏下沿用固定层绘制全宽分隔线，避免首页/子页显示不一致 */
+body::before {
+  content: '';
+  position: fixed;
+  top: var(--vp-nav-height);
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--vp-c-brand-2);
+  z-index: 59;
+  pointer-events: none;
 }
 
 /* Dark Mode 下导航栏背景 */
@@ -134,4 +147,57 @@ html:not(.dark) .VPNavBar {
 .VPNavBar .content {
   /* 保持内容垂直居中 */
   align-items: center;
+}
+
+/* 桌面端固定 Search 在右侧，避免在 logo 两侧切换 */
+@media (min-width: 960px) {
+  .VPNavBar .content-body {
+    justify-content: flex-end;
+  }
+
+  /* 统一 has-sidebar / non-sidebar 的导航布局，避免切页时横向位移 */
+  .VPNavBar.has-sidebar .container {
+    max-width: calc(var(--vp-layout-max-width) - 64px) !important;
+  }
+
+  .VPNavBar.has-sidebar .title {
+    position: static !important;
+    width: auto !important;
+    padding: 0 !important;
+  }
+
+  .VPNavBar.has-sidebar .content {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .VPNavBar .search {
+    order: 1;
+    flex: 0 0 auto;
+    margin-right: 12px;
+    padding-left: 0;
+  }
+
+  .VPNavBar .menu { order: 2; }
+  .VPNavBar .translations { order: 3; }
+  .VPNavBar .appearance { order: 4; }
+  .VPNavBar .social-links { order: 5; }
+  .VPNavBar .extra { order: 6; }
+}
+
+/* 防止右侧区域被挤压导致位置变化 */
+.VPNavBarSearch,
+.VPNavBarExtra,
+.VPNavBar .social-links {
+  flex-shrink: 0;
+}
+
+/* 避免内容体在不同页面宽度策略下触发抖动 */
+.VPNavBar .content-body {
+  min-width: 0;
+}
+
+/* 统一保留纵向滚动条，避免页面切换时横向抖动 */
+html {
+  overflow-y: scroll;
 }
