@@ -1706,6 +1706,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "llm_providers"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "404d693667dd78b508d178abb93d82a41a8b600027583defa21837dbef20a697"
+dependencies = [
+ "lazy_static",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4158,7 +4169,7 @@ dependencies = [
 
 [[package]]
 name = "zene"
-version = "0.5.4"
+version = "0.5.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4171,6 +4182,7 @@ dependencies = [
  "grep-regex",
  "ignore",
  "llm-connector",
+ "llm_providers",
  "md5",
  "reqwest",
  "serde",

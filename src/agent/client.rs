@@ -59,24 +59,26 @@ impl AgentClient {
     /// Initialize the agent client with a specific configuration
     pub fn new(config: &RoleConfig) -> Result<Self> {
         let client = if let Some(base_url) = &config.base_url {
+            // 用户在配置里显式传了自定义 base_url 时优先用用户的
             LlmClient::openai_with_base_url(&config.api_key, base_url)?
         } else {
-            match config.provider.as_str() {
-                "openai" => LlmClient::openai(&config.api_key)?,
-                "anthropic" => LlmClient::anthropic(&config.api_key)?,
-                "deepseek" => LlmClient::deepseek(&config.api_key)?,
-                "google" => LlmClient::google(&config.api_key)?,
-                "aliyun" => LlmClient::aliyun(&config.api_key)?,
-                "zhipu" => LlmClient::zhipu(&config.api_key)?,
-                "volcengine" => LlmClient::volcengine(&config.api_key)?,
-                "moonshot" => LlmClient::moonshot(&config.api_key)?,
-                "xiaomi" => LlmClient::xiaomi(&config.api_key)?,
-                "minimax" => LlmClient::openai_with_base_url(
-                    &config.api_key, 
-                    "https://api.minimaxi.com/v1"
-                )?,
-                "ollama" => LlmClient::ollama()?,
-                _ => return Err(ZeneError::ConfigError(format!("Unsupported provider: {}", config.provider))),
+            // 1. 先根据 config.provider 去 llm_providers 库里查有没有记录
+            let providers_data = llm_providers::get_providers_data();
+            
+            if let Some(provider_info) = providers_data.get(&config.provider) {
+                // 如果在这份全量 JSON 字典里找到了（包含 zhipu_global, minimax 等），
+                // 绝大多数都是 OpenAI-compatible 的，直接提取它的官方 base_url 初始化！
+                LlmClient::openai_with_base_url(&config.api_key, &provider_info.base_url)?
+            } else {
+                // 2. 如果字典里没找到（可能是测试用的，或者旧代码），回退到您的老写法兜底
+                match config.provider.as_str() {
+                    "openai" => LlmClient::openai(&config.api_key)?,
+                    "anthropic" => LlmClient::anthropic(&config.api_key)?,
+                    "deepseek" => LlmClient::deepseek(&config.api_key)?,
+                    "google" => LlmClient::google(&config.api_key)?,
+                    "ollama" => LlmClient::ollama()?,
+                    _ => return Err(ZeneError::ConfigError(format!("Unsupported provider: {}", config.provider))),
+                }
             }
         };
 

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.5] - 2026-02-22
+
+### Added
+- **LLM Providers Integration**: Integrated `llm_providers` crate to support a wide range of LLM providers (e.g., Zhipu, MiniMax, DeepSeek, etc.) via dynamic configuration. `AgentClient::new` now queries `llm_providers` for base URLs before falling back to hardcoded defaults.
+
 ## [0.5.4] - 2026-02-22
 
 ### Changed
