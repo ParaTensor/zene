@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.4] - 2026-02-22
+
+### Changed
+- **Tool Descriptions**: Enhanced tool descriptions for `read_file` and `search_code` with "CRITICAL" warnings to force LLMs (especially DeepSeek) to provide required parameters (`path`, `pattern`).
+
 ## [0.5.3] - 2026-02-22
 
 ### Fixed

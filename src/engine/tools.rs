@@ -37,7 +37,7 @@ impl ToolManager {
         let mut tools = vec![
             ToolDefinition {
                 name: "read_file".to_string(),
-                description: "Read the complete contents of a file".to_string(),
+                description: "Read the complete contents of a file. CRITICAL: You MUST provide the 'path' parameter!".to_string(),
                 input_schema: serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -82,7 +82,7 @@ impl ToolManager {
             },
             ToolDefinition {
                 name: "search_code".to_string(),
-                description: "Search for a pattern in the codebase using ripgrep".to_string(),
+                description: "Search for a pattern in the codebase using ripgrep. CRITICAL: You MUST provide the 'pattern' parameter!".to_string(),
                 input_schema: serde_json::json!({
                     "type": "object",
                     "properties": {
