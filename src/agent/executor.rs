@@ -190,6 +190,7 @@ impl Executor {
                         arguments: args.clone() 
                     });
 
+                    let event_sender = self.event_sender.clone();
                     // Create a future for each tool execution
                     let future = async move {
                         let result_content = ToolHandler::execute(
@@ -200,6 +201,7 @@ impl Executor {
                             &args_str,
                             env_vars,
                             context_engine,
+                            event_sender.as_ref(),
                         ).await;
 
                         (tool_call_id, tool_name, result_content)

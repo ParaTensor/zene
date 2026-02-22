@@ -36,6 +36,7 @@ We believe in:
 
 - **Async Native**: Built on `tokio`, Zene is 100% non-blocking and ready for high-concurrency web integration.
 - **Streaming Output**: Real-time "Thought Delta" events allow for immersive, typewriter-style UI experiences.
+- **Workspace Awareness**: Real-time `FileStateChanged` events enable IDE-like file tree updates in frontend integrations.
 - **Self-Healing**: The Reflector loop automatically fixes linting errors and failed tests.
 
 ## Key Features

@@ -40,6 +40,27 @@ impl ZeneEngine {
         self.run_with_events(request, None).await
     }
 
+    pub async fn run_stream(&self, request: RunRequest) -> Result<mpsc::UnboundedReceiver<AgentEvent>> {
+        let (tx, rx) = mpsc::unbounded_channel::<AgentEvent>();
+        let engine = self.clone();
+        
+        tokio::spawn(async move {
+            match engine.run_with_events(request, Some(tx.clone())).await {
+                Ok(res) => {
+                    let _ = tx.send(AgentEvent::Finished(res.output));
+                }
+                Err(e) => {
+                    let _ = tx.send(AgentEvent::Error { 
+                        code: "RUN_FAILED".to_string(), 
+                        message: e.to_string() 
+                    });
+                }
+            }
+        });
+
+        Ok(rx)
+    }
+
     pub async fn run_with_events(
         &self, 
         request: RunRequest, 

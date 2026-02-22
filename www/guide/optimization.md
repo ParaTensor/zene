@@ -29,11 +29,11 @@ Based on feedback from the Celadon team, Zene is undergoing a major architectura
 
 - [x] **File Change Tracking**:
     - Defined `FileChange` struct.
-- [ ] **Tool Instrumentation**:
+- [x] **Tool Instrumentation**:
     - Modify `write_file` and `apply_patch` in `ToolManager` to broadcast `FileStateChanged`.
 
 ## Execution Strategy
 
 1.  **Phase 1 (Completed)**: Refactored `tools.rs` and `session/store.rs` to be fully async.
 2.  **Phase 2 (Completed)**: Implemented `run_stream` and event definitions. Integrated `llm-connector` streaming to support real-time `ThoughtDelta` emission.
-3.  **Phase 3**: Implement file state tracking in `ToolManager`.
+3.  **Phase 3 (Completed)**: Implement file state tracking in `ToolManager` and release v0.5.0.

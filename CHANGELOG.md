@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-02-22
+
+### Added
+- **Workspace State Diff**: Added `AgentEvent::FileStateChanged` (Created/Modified) to the event stream, enabling IDE-like real-time file tree updates in frontend integrations (like Celadon).
+- **Architecture Stabilization**: Fully validated and stabilized the Async Native and Streaming Event architecture introduced in 0.4.9.
+
 ## [0.4.9] - 2026-02-22
 
 ### Added

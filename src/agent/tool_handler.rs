@@ -1,9 +1,11 @@
+use crate::engine::contracts::AgentEvent;
 use crate::engine::context::ContextEngine;
 use crate::engine::tools::ToolManager;
 use crate::engine::ui::UserInterface;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct ToolHandler;
 
@@ -16,6 +18,7 @@ impl ToolHandler {
         args_str: &str,
         env_vars_shared: Arc<Mutex<HashMap<String, String>>>,
         context_engine_shared: Arc<Mutex<ContextEngine>>,
+        event_sender: Option<&UnboundedSender<AgentEvent>>,
     ) -> String {
         let _ = context_engine_shared;
         // Confirmation check for sensitive tools
@@ -40,7 +43,7 @@ impl ToolHandler {
                 let path = args.get("path").and_then(|v| v.as_str());
                 let content = args.get("content").and_then(|v| v.as_str());
                 if let (Some(p), Some(c)) = (path, content) {
-                    match tool_manager.write_file(p, c).await {
+                    match tool_manager.write_file(p, c, event_sender).await {
                         Ok(_) => "File written successfully".to_string(),
                         Err(e) => format!("Error writing file: {}", e),
                     }
@@ -134,7 +137,7 @@ impl ToolHandler {
                 let start_line = args.get("start_line").and_then(|v| v.as_i64());
                 
                 if let (Some(p), Some(o), Some(n)) = (path, original, new) {
-                    match tool_manager.apply_patch(p, o, n, start_line).await {
+                    match tool_manager.apply_patch(p, o, n, start_line, event_sender).await {
                         Ok(_) => "Patch applied successfully".to_string(),
                         Err(e) => format!("Error applying patch: {}", e),
                     }

@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::info;
 
-pub trait UserInterface {
+pub trait UserInterface: Send + Sync {
     /// Ask user for confirmation before executing a tool
     /// Returns true if user approves, false otherwise
     fn confirm_execution(&self, tool_name: &str, args: &str) -> bool;

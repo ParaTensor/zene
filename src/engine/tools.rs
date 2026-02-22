@@ -13,6 +13,9 @@ use tokio::process::Command;
 use tokio::sync::Mutex;
 use tokio::time::{timeout, Duration};
 
+use crate::engine::contracts::{AgentEvent, FileChange};
+use tokio::sync::mpsc::UnboundedSender;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ToolDefinition {
     pub name: String,
@@ -189,12 +192,23 @@ impl ToolManager {
         Ok(content)
     }
 
-    pub async fn write_file(&self, path: &str, content: &str) -> Result<()> {
-        let path = Path::new(path);
-        if let Some(parent) = path.parent() {
+    pub async fn write_file(&self, path: &str, content: &str, event_sender: Option<&UnboundedSender<AgentEvent>>) -> Result<()> {
+        let path_obj = Path::new(path);
+        if let Some(parent) = path_obj.parent() {
             fs::create_dir_all(parent).await?;
         }
-        fs::write(path, content).await?;
+        
+        let change_type = if path_obj.exists() { "modified" } else { "created" };
+        fs::write(path_obj, content).await?;
+
+        if let Some(sender) = event_sender {
+            let _ = sender.send(AgentEvent::FileStateChanged(FileChange {
+                path: path.to_string(),
+                change_type: change_type.to_string(),
+                diff: None, // Can be improved later with actual diff
+            }));
+        }
+
         Ok(())
     }
 
@@ -293,7 +307,7 @@ impl ToolManager {
         Ok(engine.list_files(&target_path, depth))
     }
 
-    pub async fn apply_patch(&self, path: &str, original_snippet: &str, new_snippet: &str, start_line: Option<i64>) -> Result<()> {
+    pub async fn apply_patch(&self, path: &str, original_snippet: &str, new_snippet: &str, start_line: Option<i64>, event_sender: Option<&UnboundedSender<AgentEvent>>) -> Result<()> {
         let content = fs::read_to_string(path).await?;
 
         // Normalize line endings to LF
@@ -308,6 +322,14 @@ impl ToolManager {
                 new_content.push_str(new_snippet);
                 new_content.push_str(&content_lf[end_idx..]);
                 fs::write(path, new_content).await?;
+                
+                if let Some(sender) = event_sender {
+                    let _ = sender.send(AgentEvent::FileStateChanged(FileChange {
+                        path: path.to_string(),
+                        change_type: "modified".to_string(),
+                        diff: None, 
+                    }));
+                }
                 return Ok(());
             }
         }
@@ -365,6 +387,13 @@ impl ToolManager {
                  }
             }
             fs::write(path, sb).await?;
+            if let Some(sender) = event_sender {
+                let _ = sender.send(AgentEvent::FileStateChanged(FileChange {
+                    path: path.to_string(),
+                    change_type: "modified".to_string(),
+                    diff: None, 
+                }));
+            }
             return Ok(());
         }
 
