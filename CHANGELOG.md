@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1] - 2026-02-22
+
+### Changed
+- **Async Heavy Context**: Offloaded CPU-intensive context tools (`search_code`, `list_files`) to `tokio::task::spawn_blocking`, ensuring the main event loop remains responsive even during large codebase scans.
+- **Dependency Upgrade**: Upgraded `reqwest` to 0.12 and removed `blocking` feature, fully eliminating synchronous HTTP client code from the dependency tree.
+
 ## [0.5.0] - 2026-02-22
 
 ### Added
