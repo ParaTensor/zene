@@ -136,7 +136,10 @@ impl Executor {
                             }
                             
                             if !tool_call_chunk.function.name.is_empty() {
-                                current_tool.function.name.push_str(&tool_call_chunk.function.name);
+                                // Fix: Only set name if it's empty to avoid duplication if provider sends name repeatedly
+                                if current_tool.function.name.is_empty() {
+                                    current_tool.function.name.push_str(&tool_call_chunk.function.name);
+                                }
                             }
                             if !tool_call_chunk.function.arguments.is_empty() {
                                 current_tool.function.arguments.push_str(&tool_call_chunk.function.arguments);

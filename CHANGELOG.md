@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.3] - 2026-02-22
+
+### Fixed
+- **DeepSeek Streaming Bug**: Fixed a critical bug where streaming tool calls from certain providers (like DeepSeek) caused the tool name to be duplicated endlessly (e.g., `list_fileslist_files...`). The executor now intelligently handles tool name chunks, preventing redundant appending.
+
 ## [0.5.2] - 2026-02-22
 
 ### Fixed
