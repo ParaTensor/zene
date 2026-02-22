@@ -155,6 +155,31 @@ impl ContextEngine {
         
         Err(ZeneError::InternalError("Memory engine not initialized or disabled at compile time".to_string()))
     }
+
+    /// Asynchronous wrapper for search_code (spawn_blocking)
+    pub async fn search_code_async(&self, root: &Path, pattern: &str) -> Result<Vec<String>> {
+        let root = root.to_path_buf();
+        let pattern = pattern.to_string();
+        let self_clone = self.clone();
+
+        tokio::task::spawn_blocking(move || {
+            self_clone.search_code(&root, &pattern)
+        })
+        .await
+        .map_err(|e| ZeneError::InternalError(format!("spawn_blocking error: {}", e)))?
+    }
+
+    /// Asynchronous wrapper for list_files (spawn_blocking)
+    pub async fn list_files_async(&self, root: &Path, depth: Option<usize>) -> Vec<String> {
+        let root = root.to_path_buf();
+        let self_clone = self.clone();
+
+        tokio::task::spawn_blocking(move || {
+            self_clone.list_files(&root, depth)
+        })
+        .await
+        .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]

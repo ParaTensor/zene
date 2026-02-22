@@ -292,7 +292,7 @@ impl ToolManager {
     pub async fn search_code(&self, pattern: &str) -> Result<Vec<String>> {
         let root = std::env::current_dir()?;
         let engine = self.context_engine.lock().await;
-        engine.search_code(&root, pattern)
+        engine.search_code_async(&root, pattern).await
     }
 
     pub async fn list_files(&self, path: Option<&str>, depth: Option<i64>) -> Result<Vec<String>> {
@@ -304,7 +304,7 @@ impl ToolManager {
         };
         let depth = depth.map(|d| d as usize);
         let engine = self.context_engine.lock().await;
-        Ok(engine.list_files(&target_path, depth))
+        Ok(engine.list_files_async(&target_path, depth).await)
     }
 
     pub async fn apply_patch(&self, path: &str, original_snippet: &str, new_snippet: &str, start_line: Option<i64>, event_sender: Option<&UnboundedSender<AgentEvent>>) -> Result<()> {
