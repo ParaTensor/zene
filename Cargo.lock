@@ -1783,9 +1783,9 @@ checksum = "6373607a59f0be73a39b6fe456b8192fcc3585f602af20751600e974dd455e77"
 
 [[package]]
 name = "llm-connector"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "550454c78b018e475aaf954b8297d80dee308ffb55648bd73d5f3e7a3690cbfc"
+checksum = "5493c714970364f1e865c7ca35a5c532f260a28914de438f7c13b7585e94810f"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1794,10 +1794,10 @@ dependencies = [
  "log",
  "pin-project-lite",
  "rand 0.8.5",
- "reqwest 0.11.27",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
 ]
 
@@ -2686,12 +2686,10 @@ dependencies = [
  "system-configuration 0.5.1",
  "tokio",
  "tokio-native-tls",
- "tokio-util",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-streams",
  "web-sys",
  "winreg",
 ]
@@ -4418,7 +4416,7 @@ dependencies = [
 
 [[package]]
 name = "zene"
-version = "0.4.8"
+version = "0.4.9"
 dependencies = [
  "anyhow",
  "async-trait",

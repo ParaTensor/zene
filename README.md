@@ -28,7 +28,15 @@
 We believe in:
 *   **Single Binary**: No complex runtime dependencies.
 *   **Explicit Configuration**: No magic, just standard environment variables.
-*   **Agentic Composition**: Specialized roles (Planner, Executor, Reflector) working in harmony.
+1.  **Plan**: Generates a DAG of tasks.
+2.  **Execute**: Runs real commands in your shell (Async/Non-blocking).
+3.  **Reflect**: Analyzes stdout/stderr and file changes.
+
+## Features
+
+- **Async Native**: Built on `tokio`, Zene is 100% non-blocking and ready for high-concurrency web integration.
+- **Streaming Output**: Real-time "Thought Delta" events allow for immersive, typewriter-style UI experiences.
+- **Self-Healing**: The Reflector loop automatically fixes linting errors and failed tests.
 
 ## Key Features
 

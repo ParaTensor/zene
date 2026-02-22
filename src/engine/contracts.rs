@@ -24,13 +24,23 @@ pub struct TokenUsage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileChange {
+    pub path: String,
+    pub change_type: String, // "created", "modified", "deleted"
+    pub diff: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum AgentEvent {
     PlanningStarted,
     PlanGenerated(Plan),
     TaskStarted { id: usize, description: String },
+    ThoughtDelta(String),
     ToolCall { name: String, arguments: serde_json::Value },
+    ToolOutputDelta(String),
     ToolResult { name: String, result: String },
+    FileStateChanged(FileChange),
     ReflectionStarted,
     ReflectionResult { passed: bool, reason: String },
     Finished(String),

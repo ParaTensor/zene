@@ -28,7 +28,7 @@ impl ToolHandler {
         match tool_name {
             "read_file" => {
                 if let Some(path) = args.get("path").and_then(|v| v.as_str()) {
-                    match tool_manager.read_file(path) {
+                    match tool_manager.read_file(path).await {
                         Ok(content) => content,
                         Err(e) => format!("Error reading file: {}", e),
                     }
@@ -40,7 +40,7 @@ impl ToolHandler {
                 let path = args.get("path").and_then(|v| v.as_str());
                 let content = args.get("content").and_then(|v| v.as_str());
                 if let (Some(p), Some(c)) = (path, content) {
-                    match tool_manager.write_file(p, c) {
+                    match tool_manager.write_file(p, c).await {
                         Ok(_) => "File written successfully".to_string(),
                         Err(e) => format!("Error writing file: {}", e),
                     }
@@ -111,7 +111,7 @@ impl ToolHandler {
             }
             "search_code" => {
                 if let Some(pattern) = args.get("pattern").and_then(|v| v.as_str()) {
-                    match tool_manager.search_code(pattern) {
+                    match tool_manager.search_code(pattern).await {
                         Ok(matches) => matches.join("\n"),
                         Err(e) => format!("Error searching code: {}", e),
                     }
@@ -122,7 +122,7 @@ impl ToolHandler {
             "list_files" => {
                 let path = args.get("path").and_then(|v| v.as_str());
                 let depth = args.get("depth").and_then(|v| v.as_i64());
-                match tool_manager.list_files(path, depth) {
+                match tool_manager.list_files(path, depth).await {
                     Ok(files) => format!("Files:\n{}", files.join("\n")),
                     Err(e) => format!("Error listing files: {}", e),
                 }
@@ -134,7 +134,7 @@ impl ToolHandler {
                 let start_line = args.get("start_line").and_then(|v| v.as_i64());
                 
                 if let (Some(p), Some(o), Some(n)) = (path, original, new) {
-                    match tool_manager.apply_patch(p, o, n, start_line) {
+                    match tool_manager.apply_patch(p, o, n, start_line).await {
                         Ok(_) => "Patch applied successfully".to_string(),
                         Err(e) => format!("Error applying patch: {}", e),
                     }

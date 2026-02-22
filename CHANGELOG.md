@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.9] - 2026-02-22
+
+### Added
+- **Async Native Architecture**: Completely refactored the engine core to be 100% async/non-blocking. Replaced all usages of `std::fs` and `std::process` with `tokio::fs` and `tokio::process`, making Zene suitable for embedding in high-concurrency async web frameworks (like Axum).
+- **Streaming Events**: Added full support for real-time feedback. The `Executor` now emits `ThoughtDelta` events via a streaming interface, enabling "typewriter" effects in UIs.
+- **Release Workflow**: Refactored GitHub Actions to separate build and release jobs, resolving race conditions during multi-platform artifact uploads.
+
+### Changed
+- **LLM Integration**: Upgraded to `llm-connector` 0.6.1, leveraging its new streaming capabilities.
+- **Documentation**: Updated all links to point to the new [zene.run](https://zene.run) domain.
+- **Visuals**: Updated README and homepage with new, clearer SVG terminal demos.
+
 ## [0.4.3] - 2026-02-19
 
 ### Added

@@ -42,6 +42,8 @@ pub enum ZeneError {
     ReqwestError(#[from] reqwest::Error),
     #[error("MCP SDK error: {0}")]
     McpSdkError(String),
+    #[error("Provider error: {0}")]
+    ProviderError(String),
 }
 
 pub type Result<T> = std::result::Result<T, ZeneError>;

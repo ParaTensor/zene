@@ -13,6 +13,7 @@ use crate::engine::ui::AutoUserInterface;
 use crate::agent::runner::AgentRunner;
 use crate::engine::mcp::manager::McpManager;
 
+#[derive(Clone)]
 pub struct ZeneEngine {
     config: AgentConfig,
     pub tool_manager: Arc<ToolManager>,

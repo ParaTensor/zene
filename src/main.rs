@@ -182,7 +182,7 @@ async fn handle_request(req: JsonRpcRequest, engine: Arc<ZeneEngine>) -> JsonRpc
                 match name {
                     "read_file" => {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or_default();
-                        match engine.tool_manager.read_file(path) {
+                        match engine.tool_manager.read_file(path).await {
                             Ok(content) => serde_json::json!({ "content": content }),
                             Err(e) => serde_json::json!({ "error": e.to_string() }),
                         }

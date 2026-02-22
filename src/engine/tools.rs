@@ -5,7 +5,7 @@ use crate::engine::error::{Result, ZeneError};
 use xtrace_client::current_trace_id;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
+use tokio::fs;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -184,17 +184,17 @@ impl ToolManager {
         tools
     }
 
-    pub fn read_file(&self, path: &str) -> Result<String> {
-        let content = fs::read_to_string(path)?;
+    pub async fn read_file(&self, path: &str) -> Result<String> {
+        let content = fs::read_to_string(path).await?;
         Ok(content)
     }
 
-    pub fn write_file(&self, path: &str, content: &str) -> Result<()> {
+    pub async fn write_file(&self, path: &str, content: &str) -> Result<()> {
         let path = Path::new(path);
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            fs::create_dir_all(parent).await?;
         }
-        fs::write(path, content)?;
+        fs::write(path, content).await?;
         Ok(())
     }
 
@@ -275,13 +275,13 @@ impl ToolManager {
          self.run_command(&cmd_builder, envs).await
     }
 
-    pub fn search_code(&self, pattern: &str) -> Result<Vec<String>> {
+    pub async fn search_code(&self, pattern: &str) -> Result<Vec<String>> {
         let root = std::env::current_dir()?;
-        let engine = self.context_engine.blocking_lock();
+        let engine = self.context_engine.lock().await;
         engine.search_code(&root, pattern)
     }
 
-    pub fn list_files(&self, path: Option<&str>, depth: Option<i64>) -> Result<Vec<String>> {
+    pub async fn list_files(&self, path: Option<&str>, depth: Option<i64>) -> Result<Vec<String>> {
         let root = std::env::current_dir()?;
         let target_path = if let Some(p) = path {
             root.join(p)
@@ -289,12 +289,12 @@ impl ToolManager {
             root
         };
         let depth = depth.map(|d| d as usize);
-        let engine = self.context_engine.blocking_lock();
+        let engine = self.context_engine.lock().await;
         Ok(engine.list_files(&target_path, depth))
     }
 
-    pub fn apply_patch(&self, path: &str, original_snippet: &str, new_snippet: &str, start_line: Option<i64>) -> Result<()> {
-        let content = fs::read_to_string(path)?;
+    pub async fn apply_patch(&self, path: &str, original_snippet: &str, new_snippet: &str, start_line: Option<i64>) -> Result<()> {
+        let content = fs::read_to_string(path).await?;
 
         // Normalize line endings to LF
         let content_lf = content.replace("\r\n", "\n");
@@ -307,7 +307,7 @@ impl ToolManager {
                 new_content.push_str(&content_lf[..start_idx]);
                 new_content.push_str(new_snippet);
                 new_content.push_str(&content_lf[end_idx..]);
-                fs::write(path, new_content)?;
+                fs::write(path, new_content).await?;
                 return Ok(());
             }
         }
@@ -364,7 +364,7 @@ impl ToolManager {
                      sb.push('\n');
                  }
             }
-            fs::write(path, sb)?;
+            fs::write(path, sb).await?;
             return Ok(());
         }
 

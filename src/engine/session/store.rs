@@ -1,9 +1,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::fs;
+use tokio::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
 use crate::engine::session::Session;
 
@@ -21,7 +21,7 @@ pub struct FileSessionStore {
 impl FileSessionStore {
     pub fn new(storage_dir: PathBuf) -> Result<Self> {
         if !storage_dir.exists() {
-            fs::create_dir_all(&storage_dir)?;
+            std::fs::create_dir_all(&storage_dir)?;
         }
         Ok(Self { storage_dir })
     }
@@ -31,10 +31,10 @@ impl FileSessionStore {
 impl SessionStore for FileSessionStore {
     async fn load(&self, id: &str) -> Result<Option<Session>> {
         let path = self.storage_dir.join(format!("{}.json", id));
-        if !path.exists() {
+        if !fs::try_exists(&path).await? {
             return Ok(None);
         }
-        let content = fs::read_to_string(path)?;
+        let content = fs::read_to_string(path).await?;
         let session = serde_json::from_str(&content)?;
         Ok(Some(session))
     }
@@ -42,20 +42,20 @@ impl SessionStore for FileSessionStore {
     async fn save(&self, session: &Session) -> Result<()> {
         let path = self.storage_dir.join(format!("{}.json", session.id));
         let content = serde_json::to_string_pretty(session)?;
-        fs::write(path, content)?;
+        fs::write(path, content).await?;
         Ok(())
     }
 
     async fn load_all(&self) -> Result<Vec<Session>> {
         let mut sessions = Vec::new();
-        if !self.storage_dir.exists() {
+        if !fs::try_exists(&self.storage_dir).await? {
             return Ok(sessions);
         }
-        for entry in fs::read_dir(&self.storage_dir)? {
-            let entry = entry?;
+        let mut entries = fs::read_dir(&self.storage_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().map_or(false, |ext| ext == "json") {
-                let content = fs::read_to_string(&path)?;
+                let content = fs::read_to_string(&path).await?;
                 if let Ok(session) = serde_json::from_str::<Session>(&content) {
                     sessions.push(session);
                 }
@@ -86,18 +86,18 @@ impl InMemorySessionStore {
 #[async_trait]
 impl SessionStore for InMemorySessionStore {
     async fn load(&self, id: &str) -> Result<Option<Session>> {
-        let sessions = self.sessions.lock().map_err(|e| anyhow::anyhow!("Lock failed: {}", e))?;
+        let sessions = self.sessions.lock().await;
         Ok(sessions.get(id).cloned())
     }
 
     async fn save(&self, session: &Session) -> Result<()> {
-        let mut sessions = self.sessions.lock().map_err(|e| anyhow::anyhow!("Lock failed: {}", e))?;
+        let mut sessions = self.sessions.lock().await;
         sessions.insert(session.id.clone(), session.clone());
         Ok(())
     }
 
     async fn load_all(&self) -> Result<Vec<Session>> {
-        let sessions = self.sessions.lock().map_err(|e| anyhow::anyhow!("Lock failed: {}", e))?;
+        let sessions = self.sessions.lock().await;
         Ok(sessions.values().cloned().collect())
     }
 }

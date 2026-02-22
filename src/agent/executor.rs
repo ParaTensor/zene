@@ -1,8 +1,9 @@
 use crate::engine::error::Result;
-use llm_connector::types::{Message, MessageBlock, Role, Tool};
+use llm_connector::types::{Message, MessageBlock, Role, Tool, ToolCall, FunctionCall};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
+use futures::StreamExt;
 
 use crate::agent::client::AgentClient;
 use crate::agent::tool_handler::ToolHandler;
@@ -80,43 +81,102 @@ impl Executor {
             current_iteration += 1;
             info!("  [Task {}] Execution Iteration {}/{}", task.id, current_iteration, self.max_iterations);
 
-            // Call LLM
-            let response = self.client
-                .chat_with_history(history.clone(), Some(tools.clone()))
+            // Call LLM with streaming
+            let mut stream = self.client
+                .chat_stream_with_history(history.clone(), Some(tools.clone()))
                 .await?;
 
-            // Accumulate usage
-            if let Some(ref usage) = response.usage {
-                total_usage.prompt_tokens += usage.prompt_tokens;
-                total_usage.completion_tokens += usage.completion_tokens;
-                total_usage.total_tokens += usage.total_tokens;
+            let mut full_content = String::new();
+            let mut tool_calls_buffer: Vec<ToolCall> = Vec::new();
+
+            while let Some(chunk_result) = stream.next().await {
+                let chunk = chunk_result?;
+                
+                // Accumulate usage if present (usually in the last chunk)
+                if let Some(ref usage) = chunk.usage {
+                    total_usage.prompt_tokens += usage.prompt_tokens;
+                    total_usage.completion_tokens += usage.completion_tokens;
+                    total_usage.total_tokens += usage.total_tokens;
+                }
+
+                for choice in chunk.choices {
+                    let delta = choice.delta;
+
+                    // Handle content streaming (ThoughtDelta)
+                    if let Some(content_delta) = &delta.content {
+                        if !content_delta.is_empty() {
+                            full_content.push_str(content_delta);
+                            self.emit(AgentEvent::ThoughtDelta(content_delta.clone()));
+                        }
+                    }
+
+                    // Handle tool calls streaming
+                    if let Some(tool_calls_delta) = delta.tool_calls {
+                        for tool_call_chunk in tool_calls_delta {
+                            // Initialize new tool call if index matches or we need to start a new one
+                            let index = tool_call_chunk.index.unwrap_or(0);
+                            
+                            // Ensure vector has enough space
+                            if index >= tool_calls_buffer.len() {
+                                 tool_calls_buffer.resize(index + 1, ToolCall {
+                                    id: String::new(),
+                                    call_type: "function".to_string(),
+                                    function: FunctionCall {
+                                        name: String::new(),
+                                        arguments: String::new(),
+                                    },
+                                    index: Some(index), 
+                                });
+                            }
+                            
+                            let current_tool = &mut tool_calls_buffer[index];
+                            
+                            if !tool_call_chunk.id.is_empty() {
+                                current_tool.id = tool_call_chunk.id.clone();
+                            }
+                            
+                            if !tool_call_chunk.function.name.is_empty() {
+                                current_tool.function.name.push_str(&tool_call_chunk.function.name);
+                            }
+                            if !tool_call_chunk.function.arguments.is_empty() {
+                                current_tool.function.arguments.push_str(&tool_call_chunk.function.arguments);
+                            }
+                        }
+                    }
+                }
             }
 
             let mut assistant_msg = Message::new(Role::Assistant, vec![]);
 
-            if !response.content.is_empty() {
-                assistant_msg.content.push(MessageBlock::text(&response.content));
+            if !full_content.is_empty() {
+                assistant_msg.content.push(MessageBlock::text(&full_content));
             }
 
-            if !response.tool_calls().is_empty() {
-                assistant_msg.tool_calls = Some(response.tool_calls().to_vec());
+            if !tool_calls_buffer.is_empty() {
+                // Filter out empty tool calls if any
+                let valid_tool_calls: Vec<ToolCall> = tool_calls_buffer.into_iter()
+                    .filter(|tc| !tc.id.is_empty() && !tc.function.name.is_empty())
+                    .collect();
+                
+                if !valid_tool_calls.is_empty() {
+                    assistant_msg.tool_calls = Some(valid_tool_calls);
+                }
             }
 
             history.push(assistant_msg);
 
-            // If no tool calls, we assume the task is done (or the model is asking a question/providing final answer)
-            if response.tool_calls().is_empty() {
-                return Ok((response.content, total_usage));
+            if history.last().and_then(|m| m.tool_calls.as_ref()).map_or(true, |tc| tc.is_empty()) {
+                 return Ok((full_content, total_usage));
             }
 
             // Execute tools in parallel
-            let tool_calls = response.tool_calls().to_vec();
-            if !tool_calls.is_empty() {
-                let mut tool_futures = Vec::new();
+            if let Some(last_msg) = history.last() {
+                if let Some(tool_calls) = &last_msg.tool_calls {
+                    let mut tool_futures = Vec::new();
 
-                for tool_call in &tool_calls {
-                    info!("  Preparing tool call: {}", tool_call.function.name);
-                    let tool_name = tool_call.function.name.clone();
+                    for tool_call in tool_calls {
+                        info!("  Preparing tool call: {}", tool_call.function.name);
+                        let tool_name = tool_call.function.name.clone();
                     let args_str = tool_call.function.arguments.clone();
                     let tool_call_id = tool_call.id.clone();
                     let tool_manager = self.tool_manager.clone();
@@ -164,6 +224,7 @@ impl Executor {
                     };
                     history.push(tool_msg);
                 }
+            }
             }
         }
 

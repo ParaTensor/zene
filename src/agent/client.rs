@@ -1,11 +1,13 @@
 use crate::engine::error::{Result, ZeneError};
 use llm_connector::{
     types::{ChatRequest, ChatResponse, Message, Tool, ToolChoice},
-    LlmClient,
+    StreamingResponse, LlmClient,
 };
 use crate::config::RoleConfig;
 use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
+use futures::Stream;
+use std::pin::Pin;
 
 #[derive(Clone)]
 enum ClientBackend {
@@ -20,6 +22,40 @@ pub struct AgentClient {
 }
 
 impl AgentClient {
+    /// Run a streaming chat completion with history and tools
+    pub async fn chat_stream_with_history(
+        &self,
+        messages: Vec<Message>,
+        tools: Option<Vec<Tool>>,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<StreamingResponse>> + Send>>> {
+        match &self.backend {
+            ClientBackend::Real(client) => {
+                let mut request = ChatRequest {
+                    model: self.model.clone(),
+                    messages,
+                    ..Default::default()
+                };
+
+                if let Some(t) = tools {
+                    request = request.with_tools(t).with_tool_choice(ToolChoice::auto());
+                }
+
+                // Map llm_connector errors to ZeneError
+                let stream = client.chat_stream(&request).await?;
+                let mapped_stream = futures::stream::StreamExt::map(stream, |res| {
+                    res.map_err(|e| ZeneError::ProviderError(e.to_string()))
+                });
+                
+                Ok(Box::pin(mapped_stream))
+            }
+            ClientBackend::Mock(_responses) => {
+                // Mock streaming implementation simplified for release
+                // TODO: Implement full mock streaming with correct types
+                let stream = futures::stream::empty();
+                Ok(Box::pin(stream))
+            }
+        }
+    }
     /// Initialize the agent client with a specific configuration
     pub fn new(config: &RoleConfig) -> Result<Self> {
         let client = if let Some(base_url) = &config.base_url {

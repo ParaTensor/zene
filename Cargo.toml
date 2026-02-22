@@ -1,6 +1,6 @@
 [package]
 name = "zene"
-version = "0.4.8"
+version = "0.4.9"
 edition = "2021"
 description = "A high-performance multi-agent coding engine with autonomous planning and reflection."
 license = "MIT"
@@ -43,7 +43,7 @@ serde_json = "1.0"
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 
 # LLM Integration
-llm-connector = "0.6.0"
+llm-connector = { version = "0.6.1", features = ["streaming"] }
 
 # Code Analysis & Context
 tree-sitter = "0.20"
