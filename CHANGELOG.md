@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.2] - 2026-02-22
+
+### Fixed
+- **Critical Async Panic Fix**: Replaced all remaining `tokio::fs` calls in `ToolManager` (`read_file`, `write_file`, `apply_patch`) with `tokio::task::spawn_blocking`. This eliminates the possibility of blocking the Tokio runtime worker threads during heavy file I/O, solving the "Cannot block the current thread" panic once and for all.
+- **Context Tools**: Updated `search_code` and `list_files` in `ToolManager` to also use `spawn_blocking`, ensuring consistent non-blocking behavior across all tools.
+
 ## [0.5.1] - 2026-02-22
 
 ### Changed

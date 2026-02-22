@@ -1,6 +1,6 @@
 [package]
 name = "zene"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 description = "A high-performance multi-agent coding engine with autonomous planning and reflection."
 license = "MIT"

@@ -5,7 +5,6 @@ use crate::engine::error::{Result, ZeneError};
 use xtrace_client::current_trace_id;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tokio::fs;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -15,6 +14,7 @@ use tokio::time::{timeout, Duration};
 
 use crate::engine::contracts::{AgentEvent, FileChange};
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::task;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ToolDefinition {
@@ -188,28 +188,40 @@ impl ToolManager {
     }
 
     pub async fn read_file(&self, path: &str) -> Result<String> {
-        let content = fs::read_to_string(path).await?;
-        Ok(content)
+        let path = path.to_string();
+        task::spawn_blocking(move || {
+            std::fs::read_to_string(&path)
+                .map_err(|e| ZeneError::InternalError(e.to_string()))
+        })
+        .await
+        .map_err(|e| ZeneError::InternalError(format!("spawn_blocking failed: {}", e)))?
     }
 
     pub async fn write_file(&self, path: &str, content: &str, event_sender: Option<&UnboundedSender<AgentEvent>>) -> Result<()> {
-        let path_obj = Path::new(path);
-        if let Some(parent) = path_obj.parent() {
-            fs::create_dir_all(parent).await?;
-        }
-        
-        let change_type = if path_obj.exists() { "modified" } else { "created" };
-        fs::write(path_obj, content).await?;
+        let path = path.to_string();
+        let content = content.to_string();
+        let sender_clone = event_sender.cloned();
 
-        if let Some(sender) = event_sender {
-            let _ = sender.send(AgentEvent::FileStateChanged(FileChange {
-                path: path.to_string(),
-                change_type: change_type.to_string(),
-                diff: None, // Can be improved later with actual diff
-            }));
-        }
+        task::spawn_blocking(move || {
+            let p = Path::new(&path);
+            if let Some(parent) = p.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            
+            let change_type = if p.exists() { "modified" } else { "created" };
+            std::fs::write(p, content)?;
 
-        Ok(())
+            if let Some(sender) = sender_clone {
+                let _ = sender.send(AgentEvent::FileStateChanged(FileChange {
+                    path: path.to_string(),
+                    change_type: change_type.to_string(),
+                    diff: None, 
+                }));
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|e| ZeneError::InternalError(format!("spawn_blocking failed: {}", e)))?
     }
 
     pub async fn fetch_url(&self, url: &str) -> Result<String> {
@@ -308,22 +320,94 @@ impl ToolManager {
     }
 
     pub async fn apply_patch(&self, path: &str, original_snippet: &str, new_snippet: &str, start_line: Option<i64>, event_sender: Option<&UnboundedSender<AgentEvent>>) -> Result<()> {
-        let content = fs::read_to_string(path).await?;
+        let path = path.to_string();
+        let original = original_snippet.to_string();
+        let new_s = new_snippet.to_string();
+        let start = start_line;
+        let sender_clone = event_sender.cloned();
 
-        // Normalize line endings to LF
-        let content_lf = content.replace("\r\n", "\n");
-        let original_lf = original_snippet.replace("\r\n", "\n");
+        task::spawn_blocking(move || {
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| ZeneError::InternalError(e.to_string()))?;
 
-        if start_line.is_none() {
-            if let Some(start_idx) = content_lf.find(&original_lf) {
-                let end_idx = start_idx + original_lf.len();
-                let mut new_content = String::with_capacity(content_lf.len() - original_lf.len() + new_snippet.len());
-                new_content.push_str(&content_lf[..start_idx]);
-                new_content.push_str(new_snippet);
-                new_content.push_str(&content_lf[end_idx..]);
-                fs::write(path, new_content).await?;
+            // Normalize line endings to LF
+            let content_lf = content.replace("\r\n", "\n");
+            let original_lf = original.replace("\r\n", "\n");
+
+            if start.is_none() {
+                if let Some(start_idx) = content_lf.find(&original_lf) {
+                    let end_idx = start_idx + original_lf.len();
+                    let mut new_content = String::with_capacity(content_lf.len() - original_lf.len() + new_s.len());
+                    new_content.push_str(&content_lf[..start_idx]);
+                    new_content.push_str(&new_s);
+                    new_content.push_str(&content_lf[end_idx..]);
+                    std::fs::write(&path, new_content)?;
+                    
+                    if let Some(sender) = sender_clone {
+                        let _ = sender.send(AgentEvent::FileStateChanged(FileChange {
+                            path: path.to_string(),
+                            change_type: "modified".to_string(),
+                            diff: None, 
+                        }));
+                    }
+                    return Ok(());
+                }
+            }
+
+            let content_lines: Vec<&str> = content_lf.lines().collect();
+            let original_lines: Vec<&str> = original_lf.lines().collect();
+            
+            if original_lines.is_empty() {
+                 return Err(ZeneError::InternalError("Original snippet is empty".to_string()));
+            }
+
+            let mut match_found = false;
+            let mut match_start_line = 0;
+
+            let search_start = start.map(|l| (l as usize).saturating_sub(1)).unwrap_or(0);
+
+            for i in search_start..=content_lines.len().saturating_sub(original_lines.len()) {
+                let mut current_match = true;
+                for j in 0..original_lines.len() {
+                    if content_lines[i + j].trim() != original_lines[j].trim() {
+                        current_match = false;
+                        break;
+                    }
+                }
+
+                if current_match {
+                    match_found = true;
+                    match_start_line = i;
+                    break;
+                }
+            }
+
+            if match_found {
+                let mut sb = String::new();
                 
-                if let Some(sender) = event_sender {
+                for k in 0..match_start_line {
+                    sb.push_str(content_lines[k]);
+                    sb.push('\n');
+                }
+                sb.push_str(&new_s);
+                
+                let match_end_line = match_start_line + original_lines.len();
+                if match_end_line < content_lines.len() {
+                     if !new_s.ends_with('\n') {
+                         sb.push('\n');
+                     }
+                     for k in match_end_line..content_lines.len() {
+                         sb.push_str(content_lines[k]);
+                         if k < content_lines.len() - 1 {
+                             sb.push('\n');
+                         }
+                     }
+                     if !sb.ends_with('\n') && content.ends_with('\n') {
+                         sb.push('\n');
+                     }
+                }
+                std::fs::write(&path, sb)?;
+                if let Some(sender) = sender_clone {
                     let _ = sender.send(AgentEvent::FileStateChanged(FileChange {
                         path: path.to_string(),
                         change_type: "modified".to_string(),
@@ -332,71 +416,10 @@ impl ToolManager {
                 }
                 return Ok(());
             }
-        }
 
-        let content_lines: Vec<&str> = content_lf.lines().collect();
-        let original_lines: Vec<&str> = original_lf.lines().collect();
-        
-        if original_lines.is_empty() {
-             return Err(ZeneError::InternalError("Original snippet is empty".to_string()));
-        }
-
-        let mut match_found = false;
-        let mut match_start_line = 0;
-
-        let search_start = start_line.map(|l| (l as usize).saturating_sub(1)).unwrap_or(0);
-
-        for i in search_start..=content_lines.len().saturating_sub(original_lines.len()) {
-            let mut current_match = true;
-            for j in 0..original_lines.len() {
-                if content_lines[i + j].trim() != original_lines[j].trim() {
-                    current_match = false;
-                    break;
-                }
-            }
-
-            if current_match {
-                match_found = true;
-                match_start_line = i;
-                break;
-            }
-        }
-
-        if match_found {
-            let mut sb = String::new();
-            
-            for k in 0..match_start_line {
-                sb.push_str(content_lines[k]);
-                sb.push('\n');
-            }
-            sb.push_str(new_snippet);
-            
-            let match_end_line = match_start_line + original_lines.len();
-            if match_end_line < content_lines.len() {
-                 if !new_snippet.ends_with('\n') {
-                     sb.push('\n');
-                 }
-                 for k in match_end_line..content_lines.len() {
-                     sb.push_str(content_lines[k]);
-                     if k < content_lines.len() - 1 {
-                         sb.push('\n');
-                     }
-                 }
-                 if !sb.ends_with('\n') && content.ends_with('\n') {
-                     sb.push('\n');
-                 }
-            }
-            fs::write(path, sb).await?;
-            if let Some(sender) = event_sender {
-                let _ = sender.send(AgentEvent::FileStateChanged(FileChange {
-                    path: path.to_string(),
-                    change_type: "modified".to_string(),
-                    diff: None, 
-                }));
-            }
-            return Ok(());
-        }
-
-        Err(ZeneError::InternalError("Original snippet not found (tried exact and fuzzy match).".to_string()))
+            Err(ZeneError::InternalError("Original snippet not found (tried exact and fuzzy match).".to_string()))
+        })
+        .await
+        .map_err(|e| ZeneError::InternalError(format!("spawn_blocking failed: {}", e)))?
     }
 }
