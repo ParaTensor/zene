@@ -1,0 +1,9 @@
+# Ignore workspace directory where Zene stores session data and generated files
+workspace/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore environment variables file if user creates one
+.env

@@ -19,6 +19,7 @@ exclude = [
 [features]
 default = []
 knowledge = ["fastembed", "usearch", "md5"]
+pyo3 = ["dep:pyo3"]
 
 [dependencies]
 # Runtime & Async
@@ -26,6 +27,7 @@ tokio = { version = "1.36", features = ["full"] }
 anyhow = "1.0"
 thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+pyo3 = { version = "0.21", features = ["extension-module"], optional = true }
 
 # CLI & Configuration
 clap = { version = "4.5", features = ["derive"] }
