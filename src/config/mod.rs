@@ -10,6 +10,7 @@ pub struct RoleConfig {
     pub model: String,
     pub api_key: String,
     pub base_url: Option<String>,
+    pub region: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -33,6 +34,7 @@ impl AgentConfig {
             .or_else(|_| env::var("OPENAI_API_KEY"))
             .unwrap_or_default();
         let default_base_url = env::var("LLM_BASE_URL").or_else(|_| env::var("OPENAI_BASE_URL")).ok();
+        let default_region = env::var("LLM_REGION").ok();
         
         let simple_mode = env::var("ZENE_SIMPLE_MODE")
             .map(|v| v == "1" || v.to_lowercase() == "true")
@@ -42,9 +44,9 @@ impl AgentConfig {
             .map(|v| v == "1" || v.to_lowercase() == "true")
             .unwrap_or(false);
 
-        let planner = Self::load_role_config("PLANNER", &default_provider, &default_model, &default_api_key, &default_base_url);
-        let executor = Self::load_role_config("EXECUTOR", &default_provider, &default_model, &default_api_key, &default_base_url);
-        let reflector = Self::load_role_config("REFLECTOR", &default_provider, &default_model, &default_api_key, &default_base_url);
+        let planner = Self::load_role_config("PLANNER", &default_provider, &default_model, &default_api_key, &default_base_url, &default_region);
+        let executor = Self::load_role_config("EXECUTOR", &default_provider, &default_model, &default_api_key, &default_base_url, &default_region);
+        let reflector = Self::load_role_config("REFLECTOR", &default_provider, &default_model, &default_api_key, &default_base_url, &default_region);
         
         // Load MCP config from zene_config.toml if present
         let mcp = if let Ok(content) = std::fs::read_to_string("zene_config.toml") {
@@ -78,17 +80,20 @@ impl AgentConfig {
         default_model: &str,
         default_api_key: &str,
         default_base_url: &Option<String>,
+        default_region: &Option<String>,
     ) -> RoleConfig {
         let provider = env::var(format!("ZENE_{}_PROVIDER", role)).unwrap_or_else(|_| default_provider.to_string());
         let model = env::var(format!("ZENE_{}_MODEL", role)).unwrap_or_else(|_| default_model.to_string());
         let api_key = env::var(format!("ZENE_{}_API_KEY", role)).unwrap_or_else(|_| default_api_key.to_string());
         let base_url = env::var(format!("ZENE_{}_BASE_URL", role)).ok().or(default_base_url.clone());
+        let region = env::var(format!("ZENE_{}_REGION", role)).ok().or(default_region.clone());
 
         RoleConfig {
             provider,
             model,
             api_key,
             base_url,
+            region,
         }
     }
 }
@@ -115,6 +120,7 @@ impl Default for RoleConfig {
             model: "gpt-4".to_string(),
             api_key: "".to_string(),
             base_url: None,
+            region: None,
         }
     }
 }

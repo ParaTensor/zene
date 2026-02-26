@@ -1,49 +1,44 @@
 import os
-import sys
 import time
-
-# Add the python sdk to sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../python")))
-
 from zene import ZeneClient
 
-# Simple .env loader
+# Simple .env loader that searches in current and parent directories
 def load_env():
-    env_path = os.path.join(os.path.dirname(__file__), ".env")
-    if os.path.exists(env_path):
-        print(f"Loading environment from {env_path}")
-        with open(env_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                try:
-                    key, value = line.split("=", 1)
-                    key = key.strip()
-                    value = value.strip().strip('"').strip("'")
-                    if key and value:
-                        os.environ[key] = value
-                except ValueError:
-                    pass
+    # Search in current directory and its parents (up to 3 levels)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(3):
+        env_path = os.path.join(current_dir, ".env")
+        if os.path.exists(env_path):
+            print(f"Loading environment from {env_path}")
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    try:
+                        key, value = line.split("=", 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        if key and value:
+                            os.environ[key] = value
+                    except ValueError:
+                        pass
+            return
+        current_dir = os.path.dirname(current_dir)
 
 load_env()
 
 def main():
     # 1. Setup the environment
-    work_dir = os.path.join(os.path.dirname(__file__), "workspace")
+    work_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workspace")
     os.makedirs(work_dir, exist_ok=True)
     
     # Check if style_profile.md exists
     style_profile_path = os.path.join(work_dir, "style_profile.md")
     if not os.path.exists(style_profile_path):
         print("❌ style_profile.md not found in workspace.")
-        print("Checking fallback location...")
-        if os.path.exists("style_profile.md"):
-             style_profile_path = "style_profile.md"
-             print("Found in current directory.")
-        else:
-             print("Please run run.py first to analyze your style.")
-             return
+        print("Please run run.py first to analyze your style.")
+        return
 
     print(f"Working Directory: {work_dir}")
     print("Reading style profile...")
@@ -66,11 +61,11 @@ def main():
     
     2. 执行该脚本。
     
-    3. 读取 `workspace/source_article.txt` 和 `workspace/style_profile.md` (或当前目录下的 style_profile.md)。
+    3. 读取 `workspace/source_article.txt` 和 `workspace/style_profile.md`。
     
     4. 根据 `style_profile.md` 中的风格特点，改写 `source_article.txt` 的内容。
        - 保持原文的核心观点和逻辑。
-       - 模仿目标风格的语气、用词和句式。
+       - 模仿目标风格的语气、用词 and 句式。
        - 如果原文是枯燥的新闻报道，尝试用更有趣、更生动的语言重写。
        - 如果原文是严肃的学术论文，尝试用更通俗易懂的方式重写（假设风格是科普类）。
     
@@ -82,16 +77,20 @@ def main():
     print(f"Session ID: {session_id}")
 
     # Initialize Zene Client with environment variables
+    # Note: BASE_URL is optional as llm-providers handles standard mappings (e.g. zhipu, minimax)
     client = ZeneClient(
         planner_provider=os.environ.get("ZENE_PLANNER_PROVIDER"),
         planner_model=os.environ.get("ZENE_PLANNER_MODEL"),
         planner_api_key=os.environ.get("ZENE_PLANNER_API_KEY"),
+        planner_region=os.environ.get("ZENE_PLANNER_REGION"),
         executor_provider=os.environ.get("ZENE_EXECUTOR_PROVIDER"),
         executor_model=os.environ.get("ZENE_EXECUTOR_MODEL"),
         executor_api_key=os.environ.get("ZENE_EXECUTOR_API_KEY"),
+        executor_region=os.environ.get("ZENE_EXECUTOR_REGION"),
         reflector_provider=os.environ.get("ZENE_REFLECTOR_PROVIDER"),
         reflector_model=os.environ.get("ZENE_REFLECTOR_MODEL"),
-        reflector_api_key=os.environ.get("ZENE_REFLECTOR_API_KEY")
+        reflector_api_key=os.environ.get("ZENE_REFLECTOR_API_KEY"),
+        reflector_region=os.environ.get("ZENE_REFLECTOR_REGION")
     )
     client.init(work_dir=os.path.dirname(os.path.abspath(__file__)))
 
@@ -102,7 +101,7 @@ def main():
         for event in events:
             event_type = event.get("type")
             
-            if event_type == "result":
+            if event_type == "Finished":
                 result = event.get("content")
                 print("\n=== Task Completed ===")
                 
@@ -114,6 +113,11 @@ def main():
                 print(f"💻 Running: {event.get('command', '')}")
             elif event_type == "file_edit":
                 print(f"📝 Editing: {event.get('path', '')}")
+            elif event_type == "Error":
+                print(f"❌ Agent Error: {event.get('message')} (Code: {event.get('code')})")
+            elif event_type != "Finished":
+                # Fallback for other event types
+                print(f"ℹ️  Event: {event}")
 
         # Verify output
         if result:
@@ -126,8 +130,6 @@ def main():
                     print(f.read())
             else:
                 print(f"\n❌ Generation failed or file not created at {generated_path}.")
-                if os.path.exists("generated_article.md"):
-                    print("Found file in current directory instead.")
         else:
             print("\n❌ Agent failed to return a result.")
             

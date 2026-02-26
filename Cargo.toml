@@ -45,8 +45,8 @@ serde_json = "1.0"
 reqwest = { version = "0.12", features = ["json"] }
 
 # LLM Integration
-llm-connector = { version = "0.6.1", features = ["streaming"] }
-llm_providers = "0.2.2"
+llm-connector = { version = "0.7.1", features = ["streaming"] }
+llm_providers = "0.5.0"
 
 # Code Analysis & Context
 tree-sitter = "0.20"
@@ -74,4 +74,8 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "zene"
-path = "src/main.rs" 
+path = "src/main.rs"
+
+[[example]]
+name = "check_zhipu"
+path = "examples/check_zhipu.rs"

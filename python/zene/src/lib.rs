@@ -18,20 +18,26 @@ struct ZeneClient {
 impl ZeneClient {
     #[new]
     #[pyo3(signature = (
-        planner_provider=None, planner_model=None, planner_api_key=None,
-        executor_provider=None, executor_model=None, executor_api_key=None,
-        reflector_provider=None, reflector_model=None, reflector_api_key=None
+        planner_provider=None, planner_model=None, planner_api_key=None, planner_base_url=None, planner_region=None,
+        executor_provider=None, executor_model=None, executor_api_key=None, executor_base_url=None, executor_region=None,
+        reflector_provider=None, reflector_model=None, reflector_api_key=None, reflector_base_url=None, reflector_region=None
     ))]
     fn new(
         planner_provider: Option<String>,
         planner_model: Option<String>,
         planner_api_key: Option<String>,
+        planner_base_url: Option<String>,
+        planner_region: Option<String>,
         executor_provider: Option<String>,
         executor_model: Option<String>,
         executor_api_key: Option<String>,
+        executor_base_url: Option<String>,
+        executor_region: Option<String>,
         reflector_provider: Option<String>,
         reflector_model: Option<String>,
         reflector_api_key: Option<String>,
+        reflector_base_url: Option<String>,
+        reflector_region: Option<String>,
     ) -> PyResult<Self> {
         let mut config = AgentConfig::default();
 
@@ -39,14 +45,20 @@ impl ZeneClient {
         if let Some(p) = planner_provider { config.planner.provider = p; }
         if let Some(m) = planner_model { config.planner.model = m; }
         if let Some(k) = planner_api_key { config.planner.api_key = k; }
+        if let Some(u) = planner_base_url { config.planner.base_url = Some(u); }
+        if let Some(r) = planner_region { config.planner.region = Some(r); }
 
         if let Some(p) = executor_provider { config.executor.provider = p; }
         if let Some(m) = executor_model { config.executor.model = m; }
         if let Some(k) = executor_api_key { config.executor.api_key = k; }
+        if let Some(u) = executor_base_url { config.executor.base_url = Some(u); }
+        if let Some(r) = executor_region { config.executor.region = Some(r); }
 
         if let Some(p) = reflector_provider { config.reflector.provider = p; }
         if let Some(m) = reflector_model { config.reflector.model = m; }
         if let Some(k) = reflector_api_key { config.reflector.api_key = k; }
+        if let Some(u) = reflector_base_url { config.reflector.base_url = Some(u); }
+        if let Some(r) = reflector_region { config.reflector.region = Some(r); }
 
         Ok(ZeneClient {
             engine: Arc::new(Mutex::new(None)),
