@@ -1,6 +1,18 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::engine::plan::Plan;
+use chrono::{DateTime, Utc};
+use serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventEnvelope {
+    pub run_id: String,
+    pub session_id: String,
+    pub seq: u64,
+    pub ts: DateTime<Utc>,
+    pub event_type: String,
+    pub payload: Value,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunRequest {

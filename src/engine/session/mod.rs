@@ -83,4 +83,8 @@ impl SessionManager {
     pub async fn save_session(&self, session: &Session) -> Result<()> {
         self.store.save(session).await.map_err(crate::engine::error::ZeneError::from)
     }
+
+    pub async fn append_event(&self, session_id: &str, event: &crate::engine::contracts::EventEnvelope) -> Result<()> {
+        self.store.append_event(session_id, event).await.map_err(crate::engine::error::ZeneError::from)
+    }
 }

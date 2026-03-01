@@ -4,6 +4,7 @@ pub mod config;
 pub mod testing;
 
 pub use agent::engine::ZeneEngine;
-pub use engine::contracts::{RunRequest, RunResult, AgentEvent, TokenUsage};
+pub use engine::contracts::{AgentEvent, EventEnvelope, RunRequest, RunResult, TokenUsage};
 pub use engine::session::store::{SessionStore, FileSessionStore, InMemorySessionStore};
 pub use engine::session::SessionManager;
+pub use config::AgentConfig;

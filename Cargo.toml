@@ -1,6 +1,6 @@
 [package]
 name = "zene"
-version = "0.5.5"
+version = "0.6.0"
 edition = "2021"
 description = "A high-performance multi-agent coding engine with autonomous planning and reflection."
 license = "MIT"
@@ -40,6 +40,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Communication (Headless / API)
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # HTTP Client (for fetch_url tool)
 reqwest = { version = "0.12", features = ["json"] }
@@ -49,6 +50,7 @@ llm-connector = { version = "0.7.1", features = ["streaming"] }
 llm_providers = "0.6.0"
 
 # Code Analysis & Context
+regex = "1.10"
 tree-sitter = "0.20"
 tree-sitter-rust = "0.20"
 tree-sitter-typescript = "0.20"

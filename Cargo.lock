@@ -1721,9 +1721,9 @@ dependencies = [
 
 [[package]]
 name = "llm_providers"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "960404e9831f7037c3c817bd7284d1a80880a73a77f5b4185e103e956c97a71f"
+checksum = "f3af26486d6894124e48323621285f968121d6a1fcc97cfe72a3348164e26c75"
 dependencies = [
  "phf",
  "serde",
@@ -4332,6 +4332,7 @@ dependencies = [
  "llm_providers",
  "md5",
  "pyo3",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -4344,6 +4345,7 @@ dependencies = [
  "tree-sitter-rust",
  "tree-sitter-typescript",
  "usearch",
+ "uuid",
  "walkdir",
  "xtrace-client",
  "zene-mcp",

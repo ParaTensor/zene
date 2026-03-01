@@ -6,12 +6,14 @@ use std::path::PathBuf;
 use tokio::sync::Mutex;
 
 use crate::engine::session::Session;
+use crate::engine::contracts::EventEnvelope;
 
 #[async_trait]
 pub trait SessionStore: Send + Sync {
     async fn load(&self, id: &str) -> Result<Option<Session>>;
     async fn save(&self, session: &Session) -> Result<()>;
     async fn load_all(&self) -> Result<Vec<Session>>;
+    async fn append_event(&self, session_id: &str, event: &EventEnvelope) -> Result<()>;
 }
 
 pub struct FileSessionStore {
@@ -26,6 +28,8 @@ impl FileSessionStore {
         Ok(Self { storage_dir })
     }
 }
+
+use tokio::io::AsyncWriteExt;
 
 #[async_trait]
 impl SessionStore for FileSessionStore {
@@ -63,6 +67,18 @@ impl SessionStore for FileSessionStore {
         }
         Ok(sessions)
     }
+
+    async fn append_event(&self, session_id: &str, event: &EventEnvelope) -> Result<()> {
+        let path = self.storage_dir.join(format!("{}_events.jsonl", session_id));
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path).await?;
+        let json = serde_json::to_string(event)?;
+        file.write_all(json.as_bytes()).await?;
+        file.write_all(b"\n").await?;
+        Ok(())
+    }
 }
 
 pub struct InMemorySessionStore {
@@ -99,5 +115,9 @@ impl SessionStore for InMemorySessionStore {
     async fn load_all(&self) -> Result<Vec<Session>> {
         let sessions = self.sessions.lock().await;
         Ok(sessions.values().cloned().collect())
+    }
+
+    async fn append_event(&self, _session_id: &str, _event: &EventEnvelope) -> Result<()> {
+        Ok(())
     }
 }

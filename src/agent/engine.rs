@@ -13,12 +13,15 @@ use crate::engine::ui::AutoUserInterface;
 use crate::agent::runner::AgentRunner;
 use crate::engine::mcp::manager::McpManager;
 
+use crate::engine::contracts::EventEnvelope;
+use chrono::Utc;
+
 #[derive(Clone)]
 pub struct ZeneEngine {
-    config: AgentConfig,
+    pub config: AgentConfig,
     pub tool_manager: Arc<ToolManager>,
-    context_engine: Arc<Mutex<ContextEngine>>,
-    session_manager: Arc<Mutex<SessionManager>>,
+    pub context_engine: Arc<Mutex<ContextEngine>>,
+    pub session_manager: Arc<Mutex<SessionManager>>,
 }
 
 impl ZeneEngine {
@@ -59,6 +62,84 @@ impl ZeneEngine {
         });
 
         Ok(rx)
+    }
+
+    pub async fn run_envelope_stream(&self, request: RunRequest) -> Result<mpsc::UnboundedReceiver<EventEnvelope>> {
+        let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
+        let (out_tx, out_rx) = mpsc::unbounded_channel::<EventEnvelope>();
+        
+        let engine = self.clone();
+        let session_id = request.session_id.clone();
+        let run_id = uuid::Uuid::new_v4().to_string();
+        
+        // Spawn the runner
+        tokio::spawn(async move {
+            match engine.run_with_events(request, Some(tx.clone())).await {
+                Ok(res) => {
+                    let _ = tx.send(AgentEvent::Finished(res.output));
+                }
+                Err(e) => {
+                    let _ = tx.send(AgentEvent::Error { 
+                        code: "RUN_FAILED".to_string(), 
+                        message: e.to_string() 
+                    });
+                }
+            }
+        });
+
+        // Spawn the envelope processor
+        let session_manager = self.session_manager.clone();
+        let run_id_clone = run_id.clone();
+        let session_id_clone = session_id.clone();
+        
+        tokio::spawn(async move {
+            let mut seq = 0;
+            while let Some(event) = rx.recv().await {
+                seq += 1;
+                // Convert to JSON Value for payload
+                let payload = serde_json::to_value(&event).unwrap_or_default();
+                
+                // Detailed type mapping
+                let event_type = match &event {
+                    AgentEvent::PlanningStarted => "PlanningStarted",
+                    AgentEvent::PlanGenerated(_) => "PlanGenerated",
+                    AgentEvent::TaskStarted { .. } => "TaskStarted",
+                    AgentEvent::ThoughtDelta(_) => "ThoughtDelta",
+                    AgentEvent::ToolCall { .. } => "ToolCall",
+                    AgentEvent::ToolOutputDelta(_) => "ToolOutputDelta",
+                    AgentEvent::ToolResult { .. } => "ToolResult",
+                    AgentEvent::FileStateChanged { .. } => "FileStateChanged",
+                    AgentEvent::ReflectionStarted => "ReflectionStarted",
+                    AgentEvent::ReflectionResult { .. } => "ReflectionResult",
+                    AgentEvent::Finished(_) => "Finished",
+                    AgentEvent::Error { .. } => "Error",
+                }.to_string();
+                
+                let envelope = EventEnvelope {
+                    run_id: run_id_clone.clone(),
+                    session_id: session_id_clone.clone(),
+                    seq,
+                    ts: Utc::now(),
+                    event_type,
+                    payload,
+                };
+
+                // Persist
+                {
+                    let sm = session_manager.lock().await;
+                    if let Err(e) = sm.append_event(&session_id_clone, &envelope).await {
+                         error!("Failed to persist event: {}", e);
+                    }
+                }
+
+                // Forward
+                if out_tx.send(envelope).is_err() {
+                    break;
+                }
+            }
+        });
+
+        Ok(out_rx)
     }
 
     pub async fn run_with_events(
