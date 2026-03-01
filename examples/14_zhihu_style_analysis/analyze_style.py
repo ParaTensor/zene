@@ -14,7 +14,7 @@ from typing import Dict, List, Any
 class StyleAnalyzer:
     """文章风格分析器"""
     
-    def __init__(self, articles_dir: str = "workspace/articles", 
+    def __init__(self, articles_dir: str = "articles", 
                  index_file: str = "workspace/index.json"):
         self.articles_dir = Path(articles_dir)
         self.index_file = Path(index_file)
@@ -34,6 +34,31 @@ class StyleAnalyzer:
                 with open(txt_file, 'r', encoding='utf-8') as f:
                     content = f.read()
                 
+                # 尝试清洗内容：移除元数据和页脚
+                if "文章正文:" in content:
+                    parts = content.split("文章正文:", 1)
+                    if len(parts) > 1:
+                        body = parts[1]
+                        # 移除紧跟在"文章正文:"后的分隔符行
+                        body = re.sub(r'^\s*=+_*\s*\n', '', body.lstrip())
+                        
+                        # 移除页脚（通常以"内部链接:"、"图片信息:"或"文件生成时间:"结尾）
+                        footer_markers = ["内部链接:", "图片信息:", "文件生成时间:"]
+                        end_index = len(body)
+                        separator = "=" * 70
+                        
+                        for marker in footer_markers:
+                            idx = body.rfind(marker)
+                            if idx != -1:
+                                # 尝试找到该标记前的分隔符
+                                sep_idx = body.rfind(separator, 0, idx)
+                                if sep_idx != -1:
+                                    end_index = min(end_index, sep_idx)
+                                else:
+                                    end_index = min(end_index, idx)
+                        
+                        content = body[:end_index].strip()
+
                 # 尝试加载对应的JSON文件获取元数据
                 json_file = self.articles_dir / txt_file.stem / (txt_file.stem + ".json")
                 metadata = {}
