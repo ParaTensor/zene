@@ -2,6 +2,8 @@ use crate::engine::error::{Result, ZeneError};
 use ignore::WalkBuilder;
 use std::path::Path;
 use tree_sitter::{Parser, Query, QueryCursor};
+use streaming_iterator::StreamingIterator;
+
 #[cfg(feature = "knowledge")]
 use crate::engine::memory::MemoryManager;
 
@@ -21,7 +23,7 @@ impl ContextEngine {
         let _ = use_memory;
         let mut parser = Parser::new();
         // Default to Rust for now, in reality we'd swap languages dynamically
-        parser.set_language(tree_sitter_rust::language())?;
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into())?;
         
         #[cfg(feature = "knowledge")]
         let memory = if use_memory {
@@ -132,11 +134,12 @@ impl ContextEngine {
 
         // Simple query to find function definitions
         let query_str = "(function_item name: (identifier) @function)";
-        let query = Query::new(tree_sitter_rust::language(), query_str)?;
+        let query = Query::new(&tree_sitter_rust::LANGUAGE.into(), query_str)?;
         let mut cursor = QueryCursor::new();
 
         let mut definitions = Vec::new();
-        for m in cursor.matches(&query, tree.root_node(), source_code.as_bytes()) {
+        let mut matches = cursor.matches(&query, tree.root_node(), source_code.as_bytes());
+        while let Some(m) = matches.next() {
             for capture in m.captures {
                 let range = capture.node.byte_range();
                 let name = &source_code[range];
@@ -190,9 +193,27 @@ mod tests {
     fn test_context_engine_optional_memory() {
         // Test with memory disabled
         let engine_no_mem = ContextEngine::new(false).unwrap();
+        #[cfg(feature = "knowledge")]
         assert!(engine_no_mem.memory.is_none());
+
+        #[cfg(not(feature = "knowledge"))]
+        {
+             // If feature is disabled, memory field doesn't exist, so we just verify creation succeeded
+             let _ = engine_no_mem;
+        }
 
         // Test with memory enabled (this will load fastembed, might be slow or fail if no internet, but it should be initialized if logic is correct)
         // We can't easily test "Some" without actually loading the model, but we've verified "None".
+    }
+
+    #[tokio::test]
+    async fn test_analyze_definitions() {
+        let engine = ContextEngine::new(false).unwrap();
+        let code = "fn hello_world() {} pub fn another_func() -> i32 { 0 }";
+        let defs = engine.analyze_definitions(code).await.unwrap();
+        
+        assert!(defs.contains(&"hello_world".to_string()));
+        assert!(defs.contains(&"another_func".to_string()));
+        assert_eq!(defs.len(), 2);
     }
 }

@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - 2026-03-01
+
+### Changed
+- **Dependency Upgrade**: Upgraded `tree-sitter` to v0.24, `tree-sitter-rust` to v0.23, and `tree-sitter-typescript` to v0.23 to resolve version conflicts with downstream projects.
+- **API Alignment**: Updated `ContextEngine` to adapt to new `tree-sitter` API.
+
+### Fixed
+- **Configuration**: Fixed missing `region` field initialization in `RoleConfig` tests.
+
+## [0.6.0] - 2026-03-01
+
+### Added
+- **Library Integration**: Exposed `ZeneEngine`, `EventEnvelope`, and `SessionStore` in `lib.rs` to support embedding Zene as a library.
+- **Event Streaming**: Added `run_envelope_stream` to `ZeneEngine` for consuming structured agent events.
+
+### Removed
+- **JSON-RPC Server**: Removed `jsonrpsee` based server implementation to simplify the core library.
+
 ## [0.5.5] - 2026-02-22
 
 ### Added

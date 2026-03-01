@@ -1,6 +1,6 @@
 [package]
 name = "zene"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 description = "A high-performance multi-agent coding engine with autonomous planning and reflection."
 license = "MIT"
@@ -51,9 +51,9 @@ llm_providers = "0.6.0"
 
 # Code Analysis & Context
 regex = "1.10"
-tree-sitter = "0.20"
-tree-sitter-rust = "0.20"
-tree-sitter-typescript = "0.20"
+tree-sitter = "0.24"
+tree-sitter-rust = "0.23"
+tree-sitter-typescript = "0.23"
 ignore = "0.4" # For file walking respecting .gitignore
 grep = "0.2"   # For searching text patterns
 grep-regex = "0.1"
@@ -66,6 +66,7 @@ md5 = { version = "0.8.0", optional = true }
 async-trait = "0.1.89"
 futures = "0.3"
 xtrace-client = { version = "0.0.13", git = "https://github.com/lipish/xtrace", features = ["tracing"] }
+streaming-iterator = "0.1.9"
 
 # Optional: For future MCP or LSP implementation
 # tower-lsp = "0.20" 

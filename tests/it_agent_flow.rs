@@ -75,9 +75,9 @@ async fn test_agent_integration_flow() {
     let reflector_client = AgentClient::mock(vec![reflector_resp]);
 
     let config = AgentConfig {
-         planner: zene::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None },
-         executor: zene::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None },
-         reflector: zene::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None },
+         planner: zene::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None, region: None },
+         executor: zene::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None, region: None },
+         reflector: zene::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None, region: None },
          mcp: zene::config::mcp::McpConfig::default(),
          simple_mode: false,
          use_semantic_memory: false,

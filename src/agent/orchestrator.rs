@@ -327,9 +327,9 @@ mod tests {
         
         // Construct dummy config
         let config = AgentConfig {
-             planner: crate::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None },
-             executor: crate::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None },
-             reflector: crate::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None },
+             planner: crate::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None, region: None },
+             executor: crate::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None, region: None },
+             reflector: crate::config::RoleConfig { provider: "mock".to_string(), model: "mock".to_string(), api_key: "mock".to_string(), base_url: None, region: None },
              mcp: crate::config::mcp::McpConfig::default(),
              simple_mode: false,
              use_semantic_memory: false,

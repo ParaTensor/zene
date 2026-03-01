@@ -15,6 +15,7 @@ async fn main() -> Result<()> {
     println!("Indexing Result: {}", result);
 
     println!("\nPerforming Memory Search for 'memory implementation'...");
+    #[cfg(feature = "knowledge")]
     if let Some(memory) = &mut context_engine.memory {
         let results = memory.search("memory implementation", 3).await?;
         for (doc, score) in results {
@@ -26,7 +27,11 @@ async fn main() -> Result<()> {
         println!("Memory module not available.");
     }
 
+    #[cfg(not(feature = "knowledge"))]
+    println!("Knowledge feature disabled.");
+
     println!("\nPerforming Memory Search for 'agent runner loop'...");
+    #[cfg(feature = "knowledge")]
     if let Some(memory) = &mut context_engine.memory {
         let results = memory.search("agent runner loop", 3).await?;
         for (doc, score) in results {
