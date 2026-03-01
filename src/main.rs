@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
-use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info};
