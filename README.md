@@ -4,7 +4,7 @@
 
 
 
-**A High-Performance Multi-Agent Coding Engine with Autonomous Planning and Reflection**
+**An Embeddable Agent Execution Engine for Coding Workflows**
 
 [![Crates.io](https://img.shields.io/crates/v/zene.svg)](https://crates.io/crates/zene)
 [![Build Status](https://github.com/lipish/zene/actions/workflows/release.yml/badge.svg)](https://github.com/lipish/zene/actions)
@@ -23,29 +23,28 @@
 **Zene** combines **"Zen"** and **"Engine"**.
 
 *   **Zen**: Minimalist, focused, and distraction-free. We avoid bloated frameworks to provide a pure coding flow.
-*   **Engine**: High-performance, reliable, and powerful. Written in Rust to be the robust core driving your intelligent agents.
+*   **Engine**: High-performance, reliable, and powerful. Written in Rust to act as the execution core behind coding agents and developer tools.
 
 We believe in:
+*   **Embeddable Runtime**: Zene should be usable from a CLI, a Rust library, or another host application.
 *   **Single Binary**: No complex runtime dependencies.
 *   **Explicit Configuration**: No magic, just standard environment variables.
-1.  **Plan**: Generates a DAG of tasks.
-2.  **Execute**: Runs real commands in your shell (Async/Non-blocking).
-3.  **Reflect**: Analyzes stdout/stderr and file changes.
+*   **Observable Execution**: Structured events, session state, and tool boundaries should be visible to the host.
 
 ## Features
 
-- **Async Native**: Built on `tokio`, Zene is 100% non-blocking and ready for high-concurrency web integration.
-- **Streaming Output**: Real-time "Thought Delta" events allow for immersive, typewriter-style UI experiences.
-- **Workspace Awareness**: Real-time `FileStateChanged` events enable IDE-like file tree updates in frontend integrations.
-- **Self-Healing**: The Reflector loop automatically fixes linting errors and failed tests.
+- **Embeddable Engine**: Use Zene as a Rust library, a CLI runtime, or an execution backend for other developer tools.
+- **Async Native**: Built on `tokio`, Zene is non-blocking and suitable for concurrent integrations.
+- **Streaming Events**: Real-time agent events make it easier to build UIs, logs, and execution dashboards on top.
+- **Workspace Awareness**: `FileStateChanged` events enable IDE-like file tree updates in frontend integrations.
+- **Structured Agent Loop**: Planning, execution, and reflection are implemented as explicit runtime stages instead of hidden prompt behavior.
 
-## Key Features
+## Why Zene
 
+*   **Embeddable by Design**: The `ZeneEngine` facade exposes a host-friendly runtime API.
 *   **Model Agnostic**: Built on `llm-connector`, supporting OpenAI, Anthropic, DeepSeek, Google Gemini, and more.
-*   **Context Aware**: Uses `tree-sitter` for syntax-level code analysis and efficient file walking to understand project structure.
-*   **Safe Execution**: Features an OODA (Observe-Orient-Decide-Act) loop with "Dry Run" capabilities and atomic file operations.
-*   **JSON-RPC Server**: Functions as a standard server, exposing its capabilities to IDEs and other tools.
-*   **Blazing Fast**: Written in pure Rust with async I/O.
+*   **Context Aware**: Uses `tree-sitter` and fast file walking to understand project structure.
+*   **Blazing Fast**: Written in Rust with async I/O and structured concurrency.
 
 ## Installation
 
@@ -83,35 +82,17 @@ zene run "Refactor src/main.rs to extract the CLI logic into a separate module"
 zene run "Fetch https://example.com and summarize it in README.md"
 ```
 
-### 3. Server Mode
-Start Zene as a JSON-RPC server (over Stdio). This mode supports persistent sessions and multi-turn conversations.
+### 3. Embed Zene in Your Own Host
+Zene can also be embedded as a Rust library or consumed through its Python bindings. This is the recommended direction if you want to build your own IDE integration, automation service, or internal coding platform on top of the runtime.
 
-```bash
-zene server
-```
-
-#### JSON-RPC API Example
-
-**Request (Start Session):**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "agent.run",
-  "params": {
-    "instruction": "Analyze the project structure",
-    "session_id": "my-session-001"
-  },
-  "id": 1
-}
-```
-
-Sessions are automatically persisted to `~/.zene/sessions/<session_id>.json`.
+Sessions are persisted under `~/.zene/sessions/<session_id>.json` when using the default file-backed session store.
 
 ## Documentation
 
 Detailed documentation is available at [zene.run](https://zene.run) (or in the `www/` directory):
 
 *   [Architecture Guide](https://zene.run/guide/architecture)
+*   [Execution Kernel vs Strategy](https://zene.run/guide/design/execution-kernel)
 *   [Context & Memory](https://zene.run/guide/memory)
 *   [Technical Design Specs](https://zene.run/guide/design/multi-user)
 *   [Project Roadmap](https://zene.run/roadmap)

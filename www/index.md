@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "$ zene start"
-  text: "Self-Healing AI Agent"
-  tagline: "Build. Break. Fix. Repeat. <br/> A Rust-powered autonomous coding engine."
+  text: "Embeddable Agent Execution Engine"
+  tagline: "A Rust runtime for planning, tool execution, session state, and event streaming in coding workflows."
   actions:
     - theme: brand
       text: Get Started
@@ -17,34 +17,34 @@ hero:
       link: https://github.com/lipish/zene/releases
 
 features:
-  - title: Planner
-    details: Breaks down complex tasks into structured JSON execution plans. Zero hallucination architecture.
-    icon: 🧠
-  - title: Executor
-    details: High-performance Rust runtime for shell execution and file manipulation.
+  - title: Embeddable Runtime
+    details: Use Zene as a CLI runtime, Rust library, or backend for your own developer tools.
+    icon: ⚙️
+  - title: Observable Execution
+    details: Stream structured agent events for logs, UIs, dashboards, and host-side control planes.
+    icon: 📡
+  - title: Tool Runtime
+    details: Execute shell commands, file edits, Python tasks, and repo operations behind a single engine facade.
     icon: ⚡
-  - title: Reflector
-    details: Automated code review and error correction loop. Verifies logic before commit.
-    icon: 🛡️
   - title: Extensibility (MCP)
     details: Connect to any external tool via Model Context Protocol. Git, Postgres, Filesystem, and more.
     icon: 🔌
-  - title: Minimalist Footprint
-    details: Opt-in Semantic Memory (RAG) saves ~200MB of RAM. High performance by design.
-    icon: 🍃
+  - title: Strategy-Friendly
+    details: Keep orchestration policies above the runtime so products can choose direct, planned, or workflow-driven execution.
+    icon: 🧭
 ---
 
 <div align="center" style="margin: 40px auto; max-width: 900px;">
   <img src="/images/demo-terminal.svg" alt="Zene Terminal Demo" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
 </div>
 
-# The Loop
+# Runtime Model
 
-**Zene** is not just another copilot. It's an autonomous loop that **guarantees** code quality through self-reflection.
+**Zene** is the execution substrate behind coding agents and developer workflows. It provides the runtime primitives that higher-level products need.
 
-1.  **Plan**: Generates a DAG of tasks.
-2.  **Execute**: Runs real commands in your shell.
-3.  **Reflect**: Analyzes stdout/stderr and file changes.
+1.  **State**: Maintain session history, environment, and execution progress.
+2.  **Execute**: Run tools, shell commands, and file operations through one runtime.
+3.  **Observe**: Emit events so the host can inspect, persist, or steer the run.
 
 ## Installation
 

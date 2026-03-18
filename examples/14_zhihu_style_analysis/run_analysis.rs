@@ -11,6 +11,7 @@ use zene::engine::session::SessionManager;
 use zene::engine::tools::ToolManager;
 use zene::engine::ui::UserInterface;
 use zene::engine::contracts::AgentEvent;
+use zene::ExecutionStrategy;
 use tokio::sync::mpsc;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -211,7 +212,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    match orchestrator.run(goal, &mut session).await {
+    match orchestrator.run(goal, &mut session, ExecutionStrategy::Planned).await {
         Ok((_res, _)) => println!("\nOrchestrator completed successfully."),
         Err(e) => eprintln!("\nOrchestrator failed: {}", e),
     }

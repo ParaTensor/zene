@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::engine::plan::Plan;
+use crate::engine::runtime::RunSnapshot;
+use crate::engine::strategy::ExecutionStrategy;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
@@ -19,10 +21,12 @@ pub struct RunRequest {
     pub prompt: String,
     pub session_id: String,
     pub env_vars: Option<HashMap<String, String>>,
+    pub strategy: Option<ExecutionStrategy>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunResult {
+    pub run_id: String,
     pub output: String,
     pub session_id: String,
     pub usage: TokenUsage,
@@ -58,3 +62,4 @@ pub enum AgentEvent {
     Finished(String),
     Error { code: String, message: String },
 }
+

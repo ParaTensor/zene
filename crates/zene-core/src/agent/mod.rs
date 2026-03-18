@@ -5,6 +5,7 @@ pub mod planner;
 pub mod reflector;
 pub mod executor;
 pub mod orchestrator;
+pub mod strategies;
 pub mod compactor;
 pub mod tool_handler;
 pub mod engine;

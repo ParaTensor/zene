@@ -9,6 +9,8 @@ use crate::engine::ui::UserInterface;
 use crate::engine::tools::ToolManager;
 use crate::config::AgentConfig;
 use crate::engine::contracts::{AgentEvent, TokenUsage};
+use crate::engine::runtime::CancellationToken;
+use crate::engine::strategy::ExecutionStrategy;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
@@ -40,8 +42,8 @@ impl AgentRunner {
         Ok(Self { orchestrator })
     }
 
-    pub async fn run(&mut self, task: &str, session: &mut Session) -> Result<(String, TokenUsage)> {
-        self.orchestrator.run(task, session).await
+    pub async fn run(&mut self, task: &str, session: &mut Session, strategy: ExecutionStrategy) -> Result<(String, TokenUsage)> {
+        self.orchestrator.run(task, session, strategy).await
     }
 
     pub fn new_with_orchestrator(orchestrator: Orchestrator) -> Self {
@@ -50,6 +52,11 @@ impl AgentRunner {
 
     pub fn with_event_sender(mut self, sender: UnboundedSender<AgentEvent>) -> Self {
         self.orchestrator = self.orchestrator.with_event_sender(sender);
+        self
+    }
+
+    pub fn with_cancellation_token(mut self, token: CancellationToken) -> Self {
+        self.orchestrator = self.orchestrator.with_cancellation_token(token);
         self
     }
 }

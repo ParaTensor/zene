@@ -1,13 +1,14 @@
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info};
 
-use zene::ZeneEngine;
-use zene::config::AgentConfig;
-use zene::engine::session::store::FileSessionStore;
-use zene::RunRequest;
+use zene_core::config::AgentConfig;
+use zene_core::engine::session::store::FileSessionStore;
+use zene_core::{ZeneEngine, ExecutionStrategy, RunRequest};
+use zene_worker::{Worker, WorkerMessage};
 
 #[derive(Parser)]
 #[command(name = "zene")]
@@ -24,6 +25,8 @@ enum Commands {
         /// The instruction for the agent
         prompt: String,
     },
+    /// Run one request from stdin and stream JSONL events to stdout
+    Worker,
 }
 
 #[tokio::main]
@@ -32,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
 
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
-    use zene::engine::observability::init_xtrace;
+    use zene_core::engine::observability::init_xtrace;
 
     let config = AgentConfig::from_env().unwrap_or_else(|e| {
         error!("Failed to load config: {}. Using defaults.", e);
@@ -58,18 +61,26 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
-    if let Some(Commands::Run { prompt }) = cli.command {
-        info!("Running one-shot task: {}", prompt);
-        
-        let req = RunRequest {
-            prompt,
-            session_id: "cli-one-shot".to_string(),
-            env_vars: None,
-        };
+    if let Some(command) = cli.command {
+        match command {
+            Commands::Run { prompt } => {
+                info!("Running one-shot task: {}", prompt);
 
-        match engine.run(req).await {
-            Ok(result) => println!("{}", result.output),
-            Err(e) => error!("Task failed: {}", e),
+                let req = RunRequest {
+                    prompt,
+                    session_id: "cli-one-shot".to_string(),
+                    env_vars: None,
+                    strategy: Some(ExecutionStrategy::Planned),
+                };
+
+                match engine.run(req).await {
+                    Ok(result) => println!("{}", result.output),
+                    Err(e) => error!("Task failed: {}", e),
+                }
+            }
+            Commands::Worker => {
+                Worker::run(engine.as_ref()).await?;
+            }
         }
     } else {
         use clap::CommandFactory;
@@ -78,3 +89,4 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+

@@ -4,6 +4,7 @@ use zene::config::AgentConfig;
 use zene::engine::ui::UserInterface;
 use zene::engine::session::SessionManager;
 use zene::engine::session::store::FileSessionStore;
+use zene::ExecutionStrategy;
 use std::sync::Arc;
 use std::path::PathBuf;
 use tracing_subscriber;
@@ -51,7 +52,7 @@ async fn main() -> Result<()> {
     println!("Running AgentRunner with simple task...");
     
     let task = "List the files in the current directory and explain what zene_config.toml contains.";
-    let (output, usage) = runner.run(task, session).await?;
+    let (output, usage) = runner.run(task, session, ExecutionStrategy::Planned).await?;
     
     println!("\n--- Execution Result ---\n{}", output);
     println!("Token Usage: {:?}", usage);

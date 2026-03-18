@@ -59,6 +59,7 @@ export default defineConfig({
         {
           text: 'Advanced',
           items: [
+            { text: 'Worker Protocol', link: '/guide/worker' },
             { text: 'MCP Integration', link: '/guide/mcp' },
             { text: 'Python Environment', link: '/guide/python' },
             { text: 'Testing & Architecture', link: '/guide/testing' }
@@ -67,6 +68,7 @@ export default defineConfig({
         {
           text: 'Design Specs',
           items: [
+            { text: 'Execution Kernel', link: '/guide/design/execution-kernel' },
             { text: 'Multi-User Service', link: '/guide/design/multi-user' },
             { text: 'Warm Pool', link: '/guide/design/warm-pool' },
             { text: 'Spawn vs Daemon', link: '/guide/design/spawn-vs-daemon' }

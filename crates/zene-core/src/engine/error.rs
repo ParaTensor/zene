@@ -44,6 +44,9 @@ pub enum ZeneError {
     McpSdkError(String),
     #[error("Provider error: {0}")]
     ProviderError(String),
+
+    #[error("Run cancelled: {0}")]
+    Cancelled(String),
 }
 
 pub type Result<T> = std::result::Result<T, ZeneError>;

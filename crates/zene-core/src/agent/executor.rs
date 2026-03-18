@@ -9,6 +9,8 @@ use crate::agent::client::AgentClient;
 use crate::agent::tool_handler::ToolHandler;
 use crate::engine::contracts::{AgentEvent, TokenUsage};
 use crate::engine::context::ContextEngine;
+use crate::engine::error::ZeneError;
+use crate::engine::runtime::CancellationToken;
 use crate::engine::plan::Task;
 use crate::engine::tools::ToolManager;
 use crate::engine::ui::UserInterface;
@@ -21,6 +23,7 @@ pub struct Executor {
     tool_manager: Arc<ToolManager>,
     max_iterations: usize,
     event_sender: Option<UnboundedSender<AgentEvent>>,
+    cancellation_token: Option<CancellationToken>,
 }
 
 impl Executor {
@@ -30,6 +33,7 @@ impl Executor {
             tool_manager,
             max_iterations: 8, // Default task iteration limit
             event_sender: None,
+            cancellation_token: None,
         }
     }
 
@@ -38,10 +42,28 @@ impl Executor {
         self
     }
 
+    pub fn with_cancellation_token(mut self, token: CancellationToken) -> Self {
+        self.cancellation_token = Some(token);
+        self
+    }
+
     fn emit(&self, event: AgentEvent) {
         if let Some(sender) = &self.event_sender {
             let _ = sender.send(event);
         }
+    }
+
+    fn ensure_not_cancelled(&self) -> Result<()> {
+        if self
+            .cancellation_token
+            .as_ref()
+            .map(|token| token.is_cancelled())
+            .unwrap_or(false)
+        {
+            return Err(ZeneError::Cancelled("run cancelled by host".to_string()));
+        }
+
+        Ok(())
     }
 
     /// Executes a single task
@@ -54,6 +76,7 @@ impl Executor {
         context_engine_shared: Arc<Mutex<ContextEngine>>,
         user_interface: &dyn UserInterface,
     ) -> Result<(String, TokenUsage)> {
+        self.ensure_not_cancelled()?;
 
         // Add task-specific system prompt/instruction
         let task_prompt = format!(
@@ -78,6 +101,7 @@ impl Executor {
         let mut total_usage = TokenUsage::default();
 
         while current_iteration < self.max_iterations {
+            self.ensure_not_cancelled()?;
             current_iteration += 1;
             info!("  [Task {}] Execution Iteration {}/{}", task.id, current_iteration, self.max_iterations);
 
@@ -90,6 +114,7 @@ impl Executor {
             let mut tool_calls_buffer: Vec<ToolCall> = Vec::new();
 
             while let Some(chunk_result) = stream.next().await {
+                self.ensure_not_cancelled()?;
                 let chunk = chunk_result?;
                 
                 // Accumulate usage if present (usually in the last chunk)
@@ -219,6 +244,7 @@ impl Executor {
                 let results = join_all(tool_futures).await;
 
                 for (id, name, result_content) in results {
+                    self.ensure_not_cancelled()?;
                     info!("  Tool {} finished", name);
                     self.emit(AgentEvent::ToolResult { 
                         name: name.clone(), 

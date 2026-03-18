@@ -7,6 +7,7 @@ use zene::engine::context::ContextEngine;
 use zene::engine::session::SessionManager;
 use zene::engine::session::store::InMemorySessionStore;
 use zene::engine::tools::ToolManager;
+use zene::ExecutionStrategy;
 use zene::testing::MockUserInterface;
 use llm_connector::types::ChatResponse;
 
@@ -99,7 +100,7 @@ async fn test_agent_integration_flow() {
     let mut runner = AgentRunner::new_with_orchestrator(orchestrator);
 
     // 4. Run Task
-    let (result, _usage) = runner.run("Integration Test Task", &mut session).await.unwrap();
+    let (result, _usage) = runner.run("Integration Test Task", &mut session, ExecutionStrategy::Planned).await.unwrap();
 
     // 5. Verify
     assert!(result.contains("Task 1: Completed"));

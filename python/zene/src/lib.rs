@@ -3,6 +3,7 @@ use ::zene::agent::engine::ZeneEngine;
 use ::zene::engine::contracts::{RunRequest, AgentEvent};
 use ::zene::config::AgentConfig;
 use ::zene::engine::session::store::{FileSessionStore, InMemorySessionStore, SessionStore};
+use ::zene::ExecutionStrategy;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -101,6 +102,7 @@ impl ZeneClient {
                     prompt,
                     session_id,
                     env_vars: None,
+                    strategy: Some(ExecutionStrategy::Planned),
                 };
                 
                 let mut events = Vec::new();

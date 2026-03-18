@@ -1,19 +1,32 @@
 # What is Zene?
 
-Zene is a minimalist, high-performance **autonomous coding engine** written in Rust. Unlike standard AI coding assistants that simply autocomplete code, Zene operates as a continuous loop of **Planning**, **Execution**, and **Reflection**.
+Zene is a minimalist, high-performance **agent execution engine** written in Rust. Its main job is not to be an end-user copilot UI. Its main job is to provide a reusable runtime for coding agents, developer tools, and internal automation systems.
 
 ## Core Philosophy
 
-"Build. Break. Fix. Repeat."
+"Make execution a product surface, not an implementation detail."
 
-Zene assumes that code generation is imperfect. Instead of trying to get it right the first time, Zene relies on a fast feedback loop to verify its own work.
+Zene assumes that orchestration patterns will evolve, but runtime primitives should remain stable. A host should be able to reuse the same engine for direct execution, plan-driven execution, or external workflow orchestration.
 
-1.  **Plan**: Break down a high-level goal into a Directed Acyclic Graph (DAG) of tasks.
-2.  **Execute**: Perform actions (edit files, run commands) to complete a task.
-3.  **Reflect**: Analyze the outcome. Did the build fail? Did tests pass? If not, create a fix task.
+1.  **Execution Kernel**: Own runtime state, tool calls, persistence, and event emission.
+2.  **Decision Strategy**: Decide whether to plan, route, parallelize, reflect, or stop.
+3.  **Product Policy**: Choose the right strategy for a given workflow or integration surface.
+
+This keeps Zene small at the core and flexible at the edges.
+
+## What Zene Is For
+
+Zene is useful when you need:
+
+- a Rust-native execution runtime for coding tasks
+- structured event streaming for a host UI or service
+- session-aware tool execution with persistence and recovery
+- a base engine that can sit under a CLI, IDE integration, or internal platform
+
+Zene can still expose higher-level workflows such as plan-execute-reflect, but those workflows should be treated as strategies on top of the runtime rather than as the runtime itself.
 
 ## Why Rust?
 
 - **Speed**: Instant startup and low memory footprint compared to Python/Node.js agents.
 - **Safety**: Robust error handling and type safety.
-- **Concurrency**: Efficiently manage multiple agent roles (Planner, Executor, Reflector) in parallel.
+- **Concurrency**: Efficiently manage tool execution, streaming events, and host integrations.
