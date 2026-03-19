@@ -1,6 +1,8 @@
 # Architecture
 
-Zene is a high-performance, embeddable agent execution engine designed for precision, speed, and control. Its current direction is to keep execution primitives in the kernel and move orchestration policy into explicit strategies.
+Zene is a high-performance, embeddable agent execution engine designed for precision, speed, and control. Its architecture is divided into clear layers, from the high-level host interaction down to the low-level infrastructure.
+
+![Zene Architecture](/images/design/architecture.png)
 
 ## 1. Core Philosophy
 - **Embeddable Runtime**: Zene should work in-process or behind a thin worker process.
@@ -24,8 +26,8 @@ graph TD
 ### The Steps:
 1. **Observe**: Analyze the project structure and semantically retrieve relevant code (RAG).
 2. **Orient**: Use `tree-sitter` to build a mental map of definitions and dependencies.
-3. **Decide**: Formulate an atomic plan using Chain of Thought.
-4. **Act**: Execute tools (Edit, Shell, Python) in isolated child processes.
+3. **Decide**: Formulate an atomic plan using **[Plan-Execute-Reflect (P3)](/guide/optimization)**.
+4. **Act**: Execute tools (Edit, Shell, **[Python](/guide/python)**) in isolated child processes.
 5. **Verify**: Self-correct by checking compiler output and running tests.
 
 ## 3. Technical Architecture
