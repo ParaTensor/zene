@@ -129,6 +129,16 @@ fn map_error_to_contract(message: &str) -> HostErrorCode {
     }
 }
 
+fn template_fallback_text(code: HostErrorCode) -> Option<&'static str> {
+    match code {
+        HostErrorCode::ProviderAuth => Some("Provider authentication failed. Please verify credentials and retry later."),
+        HostErrorCode::ProviderRateLimit => Some("Provider is rate limited. Please retry shortly."),
+        HostErrorCode::ProviderDown => Some("Provider is temporarily unavailable. Please retry shortly."),
+        HostErrorCode::Timeout => Some("Request timed out. Please retry with a simpler prompt or a higher timeout."),
+        HostErrorCode::InvalidRequest | HostErrorCode::Internal => None,
+    }
+}
+
 fn build_error_payload(
     code: HostErrorCode,
     message: &str,
@@ -404,11 +414,12 @@ async fn handle_run_request(
             Ok(Err(e)) => {
                 let message = e.to_string();
                 let code = map_error_to_contract(&message);
+                let fallback_text = template_fallback_text(code).unwrap_or("");
                 build_final_payload(
                     &task_request_id,
                     &task_session_id,
                     "ERROR",
-                    "",
+                    fallback_text,
                     json!({
                         "prompt_tokens": 0,
                         "completion_tokens": 0,
@@ -422,7 +433,7 @@ async fn handle_run_request(
                 &task_request_id,
                 &task_session_id,
                 "TIMEOUT",
-                "",
+                template_fallback_text(HostErrorCode::Timeout).unwrap_or(""),
                 json!({
                     "prompt_tokens": 0,
                     "completion_tokens": 0,

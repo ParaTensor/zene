@@ -125,9 +125,11 @@ This document is the execution baseline for replacing the current Copilot CLI lo
 ### Story B4: Provider routing and fallback
 - [ ] Add primary/secondary provider policy.
 - [ ] Trigger fallback based on canonical error codes.
-- [ ] Add template fallback for terminal failure path.
+- [~] Add template fallback for terminal failure path.
 - Acceptance:
   - Single provider instability does not break SLA target.
+  - Notes:
+    - Host runtime now returns a template fallback text for provider-related terminal failures (`PROVIDER_AUTH`, `PROVIDER_RATE_LIMIT`, `PROVIDER_DOWN`, `TIMEOUT`).
 
 ### Story B5: Health probes and self-healing hooks
 - [ ] Add healthz (process liveness).
@@ -244,3 +246,5 @@ This document is the execution baseline for replacing the current Copilot CLI lo
 - Added host integration test file `tests/it_host_protocol.rs`.
 - Verified `cargo test --test it_host_protocol` passes (3/3).
 - Added canonical host error enum and centralized error payload builder at protocol boundary.
+- Rebasing and push completed successfully to `origin/main` after conflict resolution.
+- Added host terminal template fallback text for provider-related failures.
