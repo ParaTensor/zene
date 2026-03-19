@@ -222,7 +222,7 @@ This document is the execution baseline for replacing the current Copilot CLI lo
 ## Immediate Next Sprint (recommended)
 
 - [~] Implement A1 and A2 end-to-end with integration test harness.
-- [ ] Define the official `v1` JSON examples for clawbridge team.
+- [x] Define the official `v1` JSON examples for clawbridge team.
 - [ ] Add temporary compatibility adapter if old run mode is still needed.
 
 ## Execution Log
@@ -248,3 +248,4 @@ This document is the execution baseline for replacing the current Copilot CLI lo
 - Added canonical host error enum and centralized error payload builder at protocol boundary.
 - Rebasing and push completed successfully to `origin/main` after conflict resolution.
 - Added host terminal template fallback text for provider-related failures.
+- Added official `Host Protocol v1 JSON Examples` doc for clawbridge integration.

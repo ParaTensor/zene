@@ -96,7 +96,8 @@ export default defineConfig({
           text: 'Engineering Docs',
           items: [
             { text: 'Dev Home', link: '/dev/' },
-            { text: 'Production Execution Tasklist', link: '/dev/zene-production-execution-tasklist' }
+            { text: 'Production Execution Tasklist', link: '/dev/zene-production-execution-tasklist' },
+            { text: 'Host Protocol v1 Examples', link: '/dev/host-protocol-v1-examples' }
           ]
         }
       ]
