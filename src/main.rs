@@ -105,7 +105,10 @@ impl HostErrorCode {
 }
 
 fn now_ts_ms() -> i64 {
-    chrono::Utc::now().timestamp_millis()
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 fn map_error_to_contract(message: &str) -> HostErrorCode {
