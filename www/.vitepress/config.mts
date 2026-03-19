@@ -25,6 +25,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Roadmap', link: '/roadmap' },
+      { text: 'Dev', link: '/dev/' },
       { text: 'Blog', link: '/blog/' },
       { text: 'Examples', link: '/examples/' },
       {
@@ -87,6 +88,15 @@ export default defineConfig({
             { text: 'Web Scraping', link: '/blog/web-scraping' },
             { text: 'The Self-Healing Compiler', link: '/blog/self-healing-compiler' },
             { text: 'Refactoring Legacy Code', link: '/blog/refactoring-legacy' }
+          ]
+        }
+      ],
+      '/dev/': [
+        {
+          text: 'Engineering Docs',
+          items: [
+            { text: 'Dev Home', link: '/dev/' },
+            { text: 'Production Execution Tasklist', link: '/dev/zene-production-execution-tasklist' }
           ]
         }
       ]
