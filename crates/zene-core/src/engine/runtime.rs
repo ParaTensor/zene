@@ -30,6 +30,7 @@ pub struct RunSnapshot {
     pub finished_at: Option<DateTime<Utc>>,
     pub output: Option<String>,
     pub error_message: Option<String>,
+    pub error_code: Option<String>,
 }
 
 impl RunSnapshot {
@@ -44,6 +45,7 @@ impl RunSnapshot {
             finished_at: None,
             output: None,
             error_message: None,
+            error_code: None,
         }
     }
 
@@ -59,14 +61,16 @@ impl RunSnapshot {
         self.finished_at = Some(now);
         self.output = Some(output);
         self.error_message = None;
+        self.error_code = None;
     }
 
-    pub fn mark_failed(&mut self, message: String) {
+    pub fn mark_failed(&mut self, message: String, error_code: Option<String>) {
         let now = Utc::now();
         self.status = RunStatus::Failed;
         self.updated_at = now;
         self.finished_at = Some(now);
         self.error_message = Some(message);
+        self.error_code = error_code;
     }
 
     pub fn mark_cancelled(&mut self) {
@@ -74,6 +78,7 @@ impl RunSnapshot {
         self.status = RunStatus::Cancelled;
         self.updated_at = now;
         self.finished_at = Some(now);
+        self.error_code = None;
     }
 }
 

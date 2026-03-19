@@ -12,7 +12,7 @@ use tracing::{error, info};
 
 use zene_core::config::AgentConfig;
 use zene_core::engine::session::store::FileSessionStore;
-use zene_core::{ExecutionStrategy, RunRequest, ZeneEngine};
+use zene_core::{ExecutionStrategy, RunRequest, RunSnapshot, RunStatus, ZeneEngine};
 use zene_worker::Worker;
 
 #[derive(Parser)]
@@ -58,9 +58,8 @@ struct HostRequest {
 }
 
 struct ActiveRun {
-    session_id: String,
     run_token: String,
-    replay_key: String,
+    engine_run_id: String,
     handle: tokio::task::JoinHandle<()>,
 }
 
@@ -70,7 +69,7 @@ struct IdempotencyEntry {
     created_at: std::time::Instant,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum HostErrorCode {
     Timeout,
     ProviderAuth,
@@ -127,6 +126,20 @@ fn map_error_to_contract(message: &str) -> HostErrorCode {
     } else {
         HostErrorCode::Internal
     }
+}
+
+fn map_snapshot_error_to_contract(error_code: Option<&str>, message: &str) -> HostErrorCode {
+    if let Some(code) = error_code {
+        return match code {
+            "PROVIDER_DOWN" => HostErrorCode::ProviderDown,
+            "INVALID_REQUEST" => HostErrorCode::InvalidRequest,
+            "PROVIDER_ERROR" => map_error_to_contract(message),
+            "INTERNAL" => HostErrorCode::Internal,
+            "CANCELED" => HostErrorCode::Internal,
+            _ => map_error_to_contract(message),
+        };
+    }
+    map_error_to_contract(message)
 }
 
 fn template_fallback_text(code: HostErrorCode) -> Option<&'static str> {
@@ -347,6 +360,34 @@ async fn handle_run_request(
         strategy: Some(ExecutionStrategy::Planned),
     };
 
+    let submitted = engine.submit(run_req).await;
+    let mut run_handle = match submitted {
+        Ok(handle) => handle,
+        Err(e) => {
+            let message = e.to_string();
+            let code = map_error_to_contract(&message);
+            let fallback_text = template_fallback_text(code).unwrap_or("");
+            let final_payload = build_final_payload(
+                &request_id,
+                &session_id,
+                "ERROR",
+                fallback_text,
+                json!({
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0
+                }),
+                Some(build_error_payload(code, &message, None)),
+                0,
+            );
+            send_protocol_line(&tx, final_payload).await?;
+            return Ok(());
+        }
+    };
+
+    let engine_run_id = run_handle.run_id.clone();
+    let _ = run_handle.events.close();
+
     let task_tx = tx.clone();
     let task_engine = engine.clone();
     let task_active_runs = active_runs.clone();
@@ -355,12 +396,30 @@ async fn handle_run_request(
     let task_request_id = request_id.clone();
     let task_session_id = session_id.clone();
     let task_replay_key = replay_key.clone();
+    let task_engine_run_id = engine_run_id.clone();
     let task_run_token = uuid::Uuid::new_v4().to_string();
     let run_token_for_map = task_run_token.clone();
 
     let handle = tokio::spawn(async move {
         let started_at = std::time::Instant::now();
-        let run_result = timeout(Duration::from_millis(timeout_ms), task_engine.run(run_req)).await;
+        let terminal_snapshot = timeout(
+            Duration::from_millis(timeout_ms),
+            async {
+                loop {
+                    if let Some(snapshot) = task_engine.get_run_snapshot(&task_engine_run_id).await {
+                        if matches!(
+                            snapshot.status,
+                            RunStatus::Completed | RunStatus::Failed | RunStatus::Cancelled
+                        ) {
+                            break snapshot;
+                        }
+                    }
+                    tokio::time::sleep(Duration::from_millis(25)).await;
+                }
+            },
+        )
+        .await;
+
         let latency_ms = started_at.elapsed().as_millis() as u64;
 
         let should_emit_terminal = {
@@ -397,55 +456,33 @@ async fn handle_run_request(
             let _ = send_protocol_line(&task_tx, event).await;
         }
 
-        let final_payload = match run_result {
-            Ok(Ok(result)) => build_final_payload(
+        let final_payload = match terminal_snapshot {
+            Ok(snapshot) => build_final_from_snapshot(
                 &task_request_id,
                 &task_session_id,
-                "OK",
-                &result.output,
-                json!({
-                    "prompt_tokens": result.usage.prompt_tokens,
-                    "completion_tokens": result.usage.completion_tokens,
-                    "total_tokens": result.usage.total_tokens
-                }),
-                None,
+                snapshot,
                 latency_ms,
             ),
-            Ok(Err(e)) => {
-                let message = e.to_string();
-                let code = map_error_to_contract(&message);
-                let fallback_text = template_fallback_text(code).unwrap_or("");
+            Err(_) => {
+                let _ = task_engine.cancel_run(&task_engine_run_id).await;
                 build_final_payload(
                     &task_request_id,
                     &task_session_id,
-                    "ERROR",
-                    fallback_text,
+                    "TIMEOUT",
+                    template_fallback_text(HostErrorCode::Timeout).unwrap_or(""),
                     json!({
                         "prompt_tokens": 0,
                         "completion_tokens": 0,
                         "total_tokens": 0
                     }),
-                    Some(build_error_payload(code, &message, None)),
+                    Some(build_error_payload(
+                        HostErrorCode::Timeout,
+                        "request exceeded timeout_ms",
+                        Some(true),
+                    )),
                     latency_ms,
                 )
             }
-            Err(_) => build_final_payload(
-                &task_request_id,
-                &task_session_id,
-                "TIMEOUT",
-                template_fallback_text(HostErrorCode::Timeout).unwrap_or(""),
-                json!({
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "total_tokens": 0
-                }),
-                Some(build_error_payload(
-                    HostErrorCode::Timeout,
-                    "request exceeded timeout_ms",
-                    Some(true),
-                )),
-                latency_ms,
-            ),
         };
 
         {
@@ -466,9 +503,8 @@ async fn handle_run_request(
     active.insert(
         request_id,
         ActiveRun {
-            session_id,
             run_token: run_token_for_map,
-            replay_key: replay_key.clone(),
+            engine_run_id,
             handle,
         },
     );
@@ -479,6 +515,117 @@ async fn handle_run_request(
     }
 
     Ok(())
+}
+
+fn build_final_from_snapshot(
+    request_id: &str,
+    session_id: &str,
+    snapshot: RunSnapshot,
+    latency_ms: u64,
+) -> serde_json::Value {
+    match snapshot.status {
+        RunStatus::Completed => build_final_payload(
+            request_id,
+            session_id,
+            "OK",
+            snapshot.output.as_deref().unwrap_or(""),
+            json!({
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
+            }),
+            None,
+            latency_ms,
+        ),
+        RunStatus::Cancelled => build_final_payload(
+            request_id,
+            session_id,
+            "CANCELED",
+            "",
+            json!({
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
+            }),
+            None,
+            latency_ms,
+        ),
+        RunStatus::Failed => {
+            let message = snapshot
+                .error_message
+                .clone()
+                .unwrap_or_else(|| "run failed".to_string());
+            let code = map_snapshot_error_to_contract(snapshot.error_code.as_deref(), &message);
+            build_final_payload(
+                request_id,
+                session_id,
+                "ERROR",
+                template_fallback_text(code).unwrap_or(""),
+                json!({
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0
+                }),
+                Some(build_error_payload(code, &message, None)),
+                latency_ms,
+            )
+        }
+        _ => build_final_payload(
+            request_id,
+            session_id,
+            "ERROR",
+            "",
+            json!({
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
+            }),
+            Some(build_error_payload(
+                HostErrorCode::Internal,
+                "run finished with unexpected status",
+                Some(true),
+            )),
+            latency_ms,
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_snapshot_error_code_mapping_takes_precedence() {
+        let code = map_snapshot_error_to_contract(
+            Some("INVALID_REQUEST"),
+            "provider unavailable: upstream unavailable",
+        );
+        assert_eq!(code, HostErrorCode::InvalidRequest);
+    }
+
+    #[test]
+    fn test_build_final_from_snapshot_failed_uses_explicit_code() {
+        let mut snapshot = RunSnapshot::new("r1".to_string(), "s1".to_string());
+        snapshot.status = RunStatus::Failed;
+        snapshot.error_message = Some("downstream unavailable".to_string());
+        snapshot.error_code = Some("PROVIDER_DOWN".to_string());
+
+        let payload = build_final_from_snapshot("req_1", "s1", snapshot, 123);
+        assert_eq!(payload["type"], "final");
+        assert_eq!(payload["status"], "ERROR");
+        assert_eq!(payload["error"]["code"], "PROVIDER_DOWN");
+    }
+
+    #[test]
+    fn test_build_final_from_snapshot_cancelled_status() {
+        let mut snapshot = RunSnapshot::new("r2".to_string(), "s2".to_string());
+        snapshot.status = RunStatus::Cancelled;
+
+        let payload = build_final_from_snapshot("req_2", "s2", snapshot, 5);
+        assert_eq!(payload["type"], "final");
+        assert_eq!(payload["status"], "CANCELED");
+        assert!(payload.get("error").is_none() || payload["error"].is_null());
+    }
 }
 
 async fn prune_idempotency_cache(store: &Arc<Mutex<HashMap<String, IdempotencyEntry>>>) {
@@ -586,12 +733,24 @@ async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()>
                     continue;
                 };
 
-                let mut active = active_runs.lock().await;
-                if let Some(active_run) = active.remove(&target_request_id) {
-                    active_run.handle.abort();
-                    {
-                        let mut inflight = inflight_idempotency.lock().await;
-                        inflight.remove(&active_run.replay_key);
+                let engine_run_id = {
+                    let active = active_runs.lock().await;
+                    active
+                        .get(&target_request_id)
+                        .map(|run| run.engine_run_id.clone())
+                };
+
+                if let Some(run_id) = engine_run_id {
+                    let cancelled = engine.cancel_run(&run_id).await;
+                    if !cancelled {
+                        write_invalid_request(
+                            &out_tx,
+                            &req.request_id,
+                            req.session_id.as_deref(),
+                            "target_request_id is not cancelable",
+                        )
+                        .await?;
+                        continue;
                     }
 
                     let ack = json!({
@@ -604,21 +763,6 @@ async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()>
                         "target_request_id": target_request_id
                     });
                     send_protocol_line(&out_tx, ack).await?;
-
-                    let final_payload = build_final_payload(
-                        &target_request_id,
-                        &active_run.session_id,
-                        "CANCELED",
-                        "",
-                        json!({
-                            "prompt_tokens": 0,
-                            "completion_tokens": 0,
-                            "total_tokens": 0
-                        }),
-                        None,
-                        0,
-                    );
-                    send_protocol_line(&out_tx, final_payload).await?;
                 } else {
                     write_invalid_request(
                         &out_tx,

@@ -62,20 +62,22 @@ This document is the execution baseline for replacing the current Copilot CLI lo
   - Zero free-text-only errors at protocol boundary.
   - Notes:
     - Host runtime now uses a canonical `HostErrorCode` enum for protocol boundary error serialization.
-    - Host runtime now maps execution errors into canonical classes (`PROVIDER_AUTH`, `PROVIDER_RATE_LIMIT`, `PROVIDER_DOWN`, `INTERNAL`) by message heuristics.
-    - Full coverage still pending for provider-specific error typing.
+    - Engine runtime snapshots now carry structured `error_code` values; host final mapping prefers this typed code and only falls back to message heuristics.
+    - Host runtime still keeps heuristic fallback mapping (`PROVIDER_AUTH`, `PROVIDER_RATE_LIMIT`, `PROVIDER_DOWN`, `INTERNAL`) for backward compatibility when typed code is missing.
+    - Full provider-subtype coverage remains pending for complete elimination of fallback heuristics.
 
 ### Story A4: Per-request timeout and cancellation
 - [x] Add request-level timeout enforcement.
-- [~] Add cancel message handling by request_id.
-- [~] Propagate cancellation into model/tool execution pipeline.
+- [x] Add cancel message handling by request_id.
+- [x] Propagate cancellation into model/tool execution pipeline.
 - [~] Ensure canceled/timed-out runs emit single terminal final state.
 - Acceptance:
   - Timeout returns final status TIMEOUT and stops execution.
   - Cancel returns final status CANCELED and stops execution.
   - Notes:
-    - Host now supports canceling active request tasks by `target_request_id`/`cancel_request_id`.
-    - Cancellation currently aborts task at host layer; deeper in-engine cooperative cancellation is still pending.
+    - Host now resolves target requests to engine `run_id` and forwards cancellation through `engine.cancel_run(...)`.
+    - Timeout path now also triggers `engine.cancel_run(...)` to stop deep execution instead of only timing out the host wait path.
+    - Single-terminal-state hardening remains in progress with additional end-to-end scenario coverage.
 
 ### Story A5: Session isolation and persistence policy
 - [ ] Treat session_id as first-class key in all execution paths.
@@ -249,3 +251,9 @@ This document is the execution baseline for replacing the current Copilot CLI lo
 - Rebasing and push completed successfully to `origin/main` after conflict resolution.
 - Added host terminal template fallback text for provider-related failures.
 - Added official `Host Protocol v1 JSON Examples` doc for clawbridge integration.
+- Refactored host `run` path to use `engine.submit(...)` and terminal-state polling via engine run snapshots.
+- Added engine-level cancellation propagation for both explicit `cancel` requests and timeout-triggered termination.
+- Extended `RunSnapshot` with structured `error_code` and updated engine failure recording to persist typed failure category.
+- Updated host final error mapping to prioritize snapshot `error_code` over message heuristics.
+- Added unit tests for snapshot-based error mapping and final-state shaping in `src/main.rs`.
+- Re-verified with `cargo check`, `cargo test --bin zene`, and `cargo test --test it_host_protocol`.

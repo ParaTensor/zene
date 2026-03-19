@@ -35,6 +35,18 @@ struct RunEntry {
 }
 
 impl ZeneEngine {
+    fn classify_error_code(err: &ZeneError) -> String {
+        match err {
+            ZeneError::ConfigError(_) => "INVALID_REQUEST".to_string(),
+            ZeneError::ProviderError(_) | ZeneError::LlmConnectorError(_) | ZeneError::ModelError(_) => {
+                "PROVIDER_ERROR".to_string()
+            }
+            ZeneError::ReqwestError(_) => "PROVIDER_DOWN".to_string(),
+            ZeneError::Cancelled(_) => "CANCELED".to_string(),
+            _ => "INTERNAL".to_string(),
+        }
+    }
+
     pub async fn new(config: AgentConfig, session_store: Arc<dyn SessionStore>) -> Result<Self> {
         let context_engine = Arc::new(Mutex::new(ContextEngine::new(config.use_semantic_memory)?));
         let mcp_manager = Arc::new(McpManager::new(config.mcp.clone()));
@@ -213,7 +225,7 @@ impl ZeneEngine {
             Err(err) => {
                 match &err {
                     ZeneError::Cancelled(_) => self.mark_run_cancelled(&run_id).await,
-                    _ => self.mark_run_failed(&run_id, err.to_string()).await,
+                    _ => self.mark_run_failed(&run_id, &err).await,
                 }
                 return Err(err);
             }
@@ -247,7 +259,7 @@ impl ZeneEngine {
             Err(err) => {
                 match &err {
                     ZeneError::Cancelled(_) => self.mark_run_cancelled(&run_id).await,
-                    _ => self.mark_run_failed(&run_id, err.to_string()).await,
+                    _ => self.mark_run_failed(&run_id, &err).await,
                 }
                 return Err(err);
             }
@@ -296,10 +308,12 @@ impl ZeneEngine {
         }
     }
 
-    async fn mark_run_failed(&self, run_id: &str, message: String) {
+    async fn mark_run_failed(&self, run_id: &str, err: &ZeneError) {
         let mut runs = self.runs.lock().await;
         if let Some(entry) = runs.get_mut(run_id) {
-            entry.snapshot.mark_failed(message);
+            entry
+                .snapshot
+                .mark_failed(err.to_string(), Some(Self::classify_error_code(err)));
         }
     }
 

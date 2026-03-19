@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::engine::plan::Plan;
-use crate::engine::runtime::RunSnapshot;
 use crate::engine::strategy::ExecutionStrategy;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
