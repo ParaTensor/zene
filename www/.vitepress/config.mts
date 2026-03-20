@@ -99,7 +99,8 @@ export default defineConfig({
             { text: 'Production Execution Tasklist', link: '/dev/zene-production-execution-tasklist' },
             { text: 'Host Protocol v1 Examples', link: '/dev/host-protocol-v1-examples' },
             { text: 'Host Protocol v1 (MVP)', link: '/dev/zene-host-protocol-v1-mvp' },
-            { text: 'Error Code Degrade Matrix (MVP)', link: '/dev/zene-error-code-degrade-matrix' }
+            { text: 'Error Code Degrade Matrix (MVP)', link: '/dev/zene-error-code-degrade-matrix' },
+            { text: 'Clawbridge Command Provider Quickstart (MVP)', link: '/dev/clawbridge-command-provider-quickstart' }
           ]
         }
       ]

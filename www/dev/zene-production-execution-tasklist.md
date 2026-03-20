@@ -303,3 +303,4 @@ MVP acceptance bar:
 - Kept protocol mode as default while enabling bridge-compatible one-shot output path for command provider integration.
 - Expanded host integration tests to 8 cases with bridge-compat shape verification.
 - Re-verified `cargo test --test it_host_protocol` passes (8/8).
+- Added `Clawbridge Command Provider Quickstart (MVP)` with copy-paste startup command, request/response samples, timeout budget, and degrade triggers.
