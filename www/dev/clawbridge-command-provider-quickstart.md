@@ -5,6 +5,11 @@ This page gives copy-paste settings for replacing Copilot login flow with Zene c
 Target chain:
 - `QQ -> clawlink -> clawops -> clawbridge(command) -> zene -> clawops -> QQ`
 
+Default integration mode for clawbridge is one-shot only:
+- `host` + `--bridge-compat` + `--single-request`
+- one stdin JSON line in, one stdout JSON line out
+- do not use stream/event flow unless explicitly enabling advanced mode
+
 ## Recommended Command
 
 Use one-shot bridge-compatible response mode:
@@ -18,6 +23,9 @@ Recommended env:
 ```bash
 ZENE_STDIN_TIMEOUT_MS=10000
 ZENE_MAX_CONCURRENCY=8
+ZENE_IDEMPOTENCY_TTL_SEC=600
+ZENE_IDEMPOTENCY_MAX_KEYS=50000
+ZENE_IDEMPOTENCY_REPLAY_MARKER=true
 ```
 
 ## Preflight Check
@@ -32,6 +40,7 @@ Expected behavior:
 - stdout prints one JSON report.
 - exit code `0` means config/provider client initialization checks passed.
 - exit code `3` means config/provider check failed (for example missing API key).
+- self-test JSON includes `missing_required_env` and `provider_probe_results` for CI diagnostics.
 
 ## Request Payload (stdin)
 
@@ -46,6 +55,11 @@ Required fields for MVP:
 - `session_id`
 - `prompt`
 - `idempotency_key`
+
+Idempotency replay behavior:
+- replay hit reuses cached terminal response body.
+- if `ZENE_IDEMPOTENCY_REPLAY_MARKER=true` (default), response includes `replayed=true`.
+- tune replay window and cache cap with `ZENE_IDEMPOTENCY_TTL_SEC` and `ZENE_IDEMPOTENCY_MAX_KEYS`.
 
 ## Response Payload (stdout)
 
@@ -85,8 +99,21 @@ No retry:
 
 ## Exit Code Semantics
 
-- `0`: request handled and structured JSON returned
-- `2`: protocol/input class failure
-- `4`: runtime class failure
+- `0`: structured JSON response written to stdout (success or business error)
+- `2`: protocol/input class failure before request execution
+- `3`: preflight/config/provider initialization failure (`zene self-test` fail)
+- `4`: runtime class failure where host/engine cannot finish normal structured handling
 
 Use stdout JSON as primary contract, exit code as secondary operational signal.
+
+Advanced mode:
+- stream/event protocol examples are documented in `host-protocol-v1-examples.md` and are not the default clawbridge command-provider path.
+
+Runtime observability baseline:
+- stderr logs include host runtime metrics snapshot fields:
+	- timeout rate
+	- cancel success rate
+	- average cleanup duration (ms)
+
+Stability baseline check:
+- run `examples/15_host_soak_and_recovery.sh 50` to verify continuous parseability and post-interruption recovery.

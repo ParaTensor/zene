@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.5] - 2026-03-20
+
+### Added
+- **Protocol Compatibility Snapshots**: Added schema baseline tests for success, timeout, provider auth failure, and invalid request payloads.
+- **Host Replay Regression Test**: Added idempotency replay integration coverage to ensure response reuse and replay marker behavior are stable.
+- **Production Runbook**: Added Railway-oriented production parameter guide and troubleshooting order.
+- **Stability Script**: Added soak and interruption-recovery script for command-provider reliability checks.
+
+### Changed
+- **Self-Test Diagnostics**: Enhanced `zene self-test` JSON to include `missing_required_env` and `provider_probe_results` for CI-friendly preflight diagnostics.
+- **Idempotency Policy Controls**: Made idempotency TTL, cache cap, and replay marker behavior configurable via env vars.
+- **Runtime Observability**: Added host runtime metric snapshots for timeout rate, cancel success rate, and average cleanup duration.
+- **Error Mapping Determinism**: Strengthened structured error-code precedence and expanded mapping rule tests for auth/rate-limit/provider-down classes.
+- **Integration Docs**: Consolidated clawbridge guidance around one-shot `host + bridge-compat + single-request` as the default path.
+
 ## [0.6.4] - 2026-03-20
 
 ### Fixed

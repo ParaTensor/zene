@@ -2,9 +2,10 @@ use clap::{Parser, Subcommand};
 use dotenv::dotenv;
 use serde::Deserialize;
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::{mpsc, Mutex, Semaphore};
 use tokio::time::{timeout, Duration};
@@ -16,10 +17,99 @@ use zene_core::agent::AgentClient;
 use zene_core::{ExecutionStrategy, RunRequest, RunSnapshot, RunStatus, ZeneEngine};
 use zene_worker::Worker;
 
+// Exit code contract used across docs and integrations:
+// 0 = structured result written to stdout (success or business error payload)
+// 2 = protocol/input failure before request execution
+// 3 = preflight/config/provider initialization failure (for example self-test fail)
+// 4 = runtime failure where host/engine cannot finish normal structured handling
 const EXIT_OK: i32 = 0;
 const EXIT_PROTOCOL_ERROR: i32 = 2;
 const EXIT_CONFIG_ERROR: i32 = 3;
 const EXIT_RUNTIME_ERROR: i32 = 4;
+
+#[derive(Clone, Copy)]
+struct IdempotencyConfig {
+    ttl: Duration,
+    max_entries: usize,
+    replay_marker_enabled: bool,
+}
+
+struct HostRuntimeMetrics {
+    accepted_requests: AtomicU64,
+    timed_out_requests: AtomicU64,
+    cancel_attempts: AtomicU64,
+    cancel_success: AtomicU64,
+    cleanup_total_ms: AtomicU64,
+    cleanup_samples: AtomicU64,
+}
+
+impl HostRuntimeMetrics {
+    fn new() -> Self {
+        Self {
+            accepted_requests: AtomicU64::new(0),
+            timed_out_requests: AtomicU64::new(0),
+            cancel_attempts: AtomicU64::new(0),
+            cancel_success: AtomicU64::new(0),
+            cleanup_total_ms: AtomicU64::new(0),
+            cleanup_samples: AtomicU64::new(0),
+        }
+    }
+
+    fn mark_accepted(&self) {
+        self.accepted_requests.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn mark_timeout(&self) {
+        self.timed_out_requests.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn mark_cancel_attempt(&self) {
+        self.cancel_attempts.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn mark_cancel_success(&self) {
+        self.cancel_success.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_cleanup_ms(&self, cleanup_ms: u64) {
+        self.cleanup_total_ms.fetch_add(cleanup_ms, Ordering::Relaxed);
+        self.cleanup_samples.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn log_snapshot(&self, event: &str) {
+        let accepted = self.accepted_requests.load(Ordering::Relaxed);
+        let timed_out = self.timed_out_requests.load(Ordering::Relaxed);
+        let cancel_attempts = self.cancel_attempts.load(Ordering::Relaxed);
+        let cancel_success = self.cancel_success.load(Ordering::Relaxed);
+        let cleanup_total_ms = self.cleanup_total_ms.load(Ordering::Relaxed);
+        let cleanup_samples = self.cleanup_samples.load(Ordering::Relaxed);
+
+        let timeout_rate = if accepted > 0 {
+            timed_out as f64 / accepted as f64
+        } else {
+            0.0
+        };
+        let cancel_success_rate = if cancel_attempts > 0 {
+            cancel_success as f64 / cancel_attempts as f64
+        } else {
+            0.0
+        };
+        let avg_cleanup_ms = if cleanup_samples > 0 {
+            cleanup_total_ms as f64 / cleanup_samples as f64
+        } else {
+            0.0
+        };
+
+        info!(
+            "host_runtime_metrics event={} accepted={} timeout_rate={:.4} cancel_success_rate={:.4} avg_cleanup_ms={:.2}",
+            event,
+            accepted,
+            timeout_rate,
+            cancel_success_rate,
+            avg_cleanup_ms
+        );
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "zene")]
@@ -70,6 +160,7 @@ fn redact_secret(value: &str) -> String {
 
 fn run_self_test(config: &AgentConfig) -> serde_json::Value {
     let mut checks = Vec::new();
+    let mut missing_required_env = BTreeSet::new();
 
     let roles = [
         ("planner", &config.planner),
@@ -81,12 +172,20 @@ fn run_self_test(config: &AgentConfig) -> serde_json::Value {
         let api_key_present = !cfg.api_key.trim().is_empty();
         let provider = cfg.provider.clone();
         let model = cfg.model.clone();
+        let role_api_key_env = format!("ZENE_{}_API_KEY", role.to_uppercase());
+
+        if !api_key_present {
+            missing_required_env.insert(role_api_key_env.clone());
+            missing_required_env.insert("LLM_API_KEY".to_string());
+            missing_required_env.insert("OPENAI_API_KEY".to_string());
+        }
 
         let client_init = AgentClient::new(cfg);
-        let (ok, error_message) = match client_init {
-            Ok(_) => (api_key_present, if api_key_present { None } else { Some("api_key is empty".to_string()) }),
+        let (client_init_ok, error_message) = match client_init {
+            Ok(_) => (true, None),
             Err(e) => (false, Some(e.to_string())),
         };
+        let ok = api_key_present && client_init_ok;
 
         checks.push(json!({
             "role": role,
@@ -94,6 +193,21 @@ fn run_self_test(config: &AgentConfig) -> serde_json::Value {
             "model": model,
             "api_key_present": api_key_present,
             "api_key_hint": redact_secret(&cfg.api_key),
+            "missing_required_env": if api_key_present {
+                serde_json::Value::Array(vec![])
+            } else {
+                serde_json::Value::Array(vec![
+                    json!(role_api_key_env),
+                    json!("LLM_API_KEY"),
+                    json!("OPENAI_API_KEY"),
+                ])
+            },
+            "provider_probe": {
+                "provider": provider.clone(),
+                "base_url": cfg.base_url.clone(),
+                "region": cfg.region.clone(),
+                "client_init_ok": client_init_ok,
+            },
             "ok": ok,
             "error": error_message,
         }));
@@ -103,9 +217,25 @@ fn run_self_test(config: &AgentConfig) -> serde_json::Value {
         .iter()
         .all(|c| c.get("ok").and_then(|v| v.as_bool()).unwrap_or(false));
 
+    let missing_required_env: Vec<String> = missing_required_env.into_iter().collect();
+    let provider_probe_results: Vec<serde_json::Value> = checks
+        .iter()
+        .map(|check| {
+            json!({
+                "role": check.get("role").cloned().unwrap_or_else(|| json!("unknown")),
+                "probe": check
+                    .get("provider_probe")
+                    .cloned()
+                    .unwrap_or_else(|| json!({}))
+            })
+        })
+        .collect();
+
     json!({
         "ok": all_ok,
         "status": if all_ok { "PASS" } else { "FAIL" },
+        "missing_required_env": missing_required_env,
+        "provider_probe_results": provider_probe_results,
         "checks": checks,
     })
 }
@@ -207,6 +337,9 @@ fn map_error_to_contract(message: &str) -> HostErrorCode {
 fn map_snapshot_error_to_contract(error_code: Option<&str>, message: &str) -> HostErrorCode {
     if let Some(code) = error_code {
         return match code {
+            "TIMEOUT" => HostErrorCode::Timeout,
+            "PROVIDER_AUTH" => HostErrorCode::ProviderAuth,
+            "PROVIDER_RATE_LIMIT" => HostErrorCode::ProviderRateLimit,
             "PROVIDER_DOWN" => HostErrorCode::ProviderDown,
             "INVALID_REQUEST" => HostErrorCode::InvalidRequest,
             "PROVIDER_ERROR" => map_error_to_contract(message),
@@ -417,6 +550,8 @@ async fn handle_run_request(
     active_runs: Arc<Mutex<HashMap<String, ActiveRun>>>,
     idempotency_store: Arc<Mutex<HashMap<String, IdempotencyEntry>>>,
     inflight_idempotency: Arc<Mutex<HashMap<String, String>>>,
+    idempotency_config: IdempotencyConfig,
+    metrics: Arc<HostRuntimeMetrics>,
     global_slots: Arc<Semaphore>,
     emit_ack: bool,
     allow_orphan_terminal: bool,
@@ -503,13 +638,15 @@ async fn handle_run_request(
     {
         let store = idempotency_store.lock().await;
         if let Some(entry) = store.get(&replay_key) {
-            if entry.created_at.elapsed() <= Duration::from_secs(600) {
+            if entry.created_at.elapsed() <= idempotency_config.ttl {
                 let mut replay = entry.final_payload.clone();
                 if let Some(obj) = replay.as_object_mut() {
                     obj.insert("request_id".to_string(), json!(request_id));
                     obj.insert("session_id".to_string(), json!(session_id));
                     obj.insert("ts_ms".to_string(), json!(now_ts_ms()));
-                    obj.insert("replayed".to_string(), json!(true));
+                    if idempotency_config.replay_marker_enabled {
+                        obj.insert("replayed".to_string(), json!(true));
+                    }
                 }
                 send_protocol_line(&tx, replay).await?;
                 return Ok(());
@@ -540,6 +677,8 @@ async fn handle_run_request(
         });
         send_protocol_line(&tx, ack).await?;
     }
+
+    metrics.mark_accepted();
 
     let _ = stream;
     let _ = req.metadata;
@@ -584,6 +723,7 @@ async fn handle_run_request(
     let task_active_runs = active_runs.clone();
     let task_store = idempotency_store.clone();
     let task_inflight = inflight_idempotency.clone();
+    let task_metrics = metrics.clone();
     let task_request_id = request_id.clone();
     let task_session_id = session_id.clone();
     let task_replay_key = replay_key.clone();
@@ -638,6 +778,8 @@ async fn handle_run_request(
             return;
         }
 
+        let cleanup_started_at = std::time::Instant::now();
+
         {
             let mut inflight = task_inflight.lock().await;
             inflight.remove(&task_replay_key);
@@ -651,7 +793,13 @@ async fn handle_run_request(
                 latency_ms,
             ),
             Err(_) => {
-                let _ = task_engine.cancel_run(&task_engine_run_id).await;
+                let cancel_ok = task_engine.cancel_run(&task_engine_run_id).await;
+                task_metrics.mark_timeout();
+                info!(
+                    "timeout_cleanup request_id={} cancel_success={}",
+                    task_request_id,
+                    cancel_ok
+                );
                 build_final_payload(
                     &task_request_id,
                     &task_session_id,
@@ -689,6 +837,10 @@ async fn handle_run_request(
             final_payload
         };
         let _ = send_protocol_line(&task_tx, outbound).await;
+
+        let cleanup_ms = cleanup_started_at.elapsed().as_millis() as u64;
+        task_metrics.record_cleanup_ms(cleanup_ms);
+        task_metrics.log_snapshot("terminal_emitted");
     });
 
     let mut active = active_runs.lock().await;
@@ -818,11 +970,86 @@ mod tests {
         assert_eq!(payload["status"], "CANCELED");
         assert!(payload.get("error").is_none() || payload["error"].is_null());
     }
+
+    #[test]
+    fn test_snapshot_error_code_mapping_timeout_precedence_over_message() {
+        let code = map_snapshot_error_to_contract(Some("TIMEOUT"), "random free text error");
+        assert_eq!(code, HostErrorCode::Timeout);
+    }
+
+    #[test]
+    fn test_snapshot_error_code_mapping_provider_down_precedence_over_message() {
+        let code = map_snapshot_error_to_contract(Some("PROVIDER_DOWN"), "totally unrelated message");
+        assert_eq!(code, HostErrorCode::ProviderDown);
+    }
+
+    #[test]
+    fn test_snapshot_error_code_mapping_provider_auth_precedence_over_message() {
+        let code = map_snapshot_error_to_contract(Some("PROVIDER_AUTH"), "network timeout text");
+        assert_eq!(code, HostErrorCode::ProviderAuth);
+    }
+
+    #[test]
+    fn test_snapshot_error_code_mapping_provider_rate_limit_precedence_over_message() {
+        let code =
+            map_snapshot_error_to_contract(Some("PROVIDER_RATE_LIMIT"), "service unavailable text");
+        assert_eq!(code, HostErrorCode::ProviderRateLimit);
+    }
+
+    #[test]
+    fn test_timeout_has_structured_fallback_strategy_text() {
+        assert_eq!(
+            template_fallback_text(HostErrorCode::Timeout),
+            Some("Request timed out. Please retry with a simpler prompt or a higher timeout.")
+        );
+    }
+
+    #[test]
+    fn test_provider_down_has_structured_fallback_strategy_text() {
+        assert_eq!(
+            template_fallback_text(HostErrorCode::ProviderDown),
+            Some("Provider is temporarily unavailable. Please retry shortly.")
+        );
+    }
+
+    #[test]
+    fn test_provider_mapping_heuristics_auth() {
+        assert_eq!(
+            map_error_to_contract("upstream unauthorized: invalid api key"),
+            HostErrorCode::ProviderAuth
+        );
+    }
+
+    #[test]
+    fn test_provider_mapping_heuristics_rate_limit() {
+        assert_eq!(
+            map_error_to_contract("429 too many requests from provider"),
+            HostErrorCode::ProviderRateLimit
+        );
+    }
+
+    #[test]
+    fn test_provider_mapping_heuristics_provider_down() {
+        assert_eq!(
+            map_error_to_contract("service unavailable: dns failure"),
+            HostErrorCode::ProviderDown
+        );
+    }
+
+    #[test]
+    fn test_read_idempotency_config_defaults() {
+        let cfg = read_idempotency_config();
+        assert!(cfg.ttl.as_secs() >= 1);
+        assert!(cfg.max_entries >= 1);
+    }
 }
 
-async fn prune_idempotency_cache(store: &Arc<Mutex<HashMap<String, IdempotencyEntry>>>) {
-    let ttl = Duration::from_secs(600);
-    let max_entries = 50_000usize;
+async fn prune_idempotency_cache(
+    store: &Arc<Mutex<HashMap<String, IdempotencyEntry>>>,
+    config: IdempotencyConfig,
+) {
+    let ttl = config.ttl;
+    let max_entries = config.max_entries;
     let mut guard = store.lock().await;
     guard.retain(|_, entry| entry.created_at.elapsed() <= ttl);
 
@@ -857,6 +1084,34 @@ fn read_stdin_timeout_ms(cli_timeout_ms: Option<u64>) -> u64 {
         .unwrap_or(15_000)
 }
 
+fn read_idempotency_config() -> IdempotencyConfig {
+    let ttl_sec = std::env::var("ZENE_IDEMPOTENCY_TTL_SEC")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(600);
+
+    let max_entries = std::env::var("ZENE_IDEMPOTENCY_MAX_KEYS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(50_000);
+
+    let replay_marker_enabled = std::env::var("ZENE_IDEMPOTENCY_REPLAY_MARKER")
+        .ok()
+        .map(|v| {
+            let normalized = v.to_lowercase();
+            normalized == "1" || normalized == "true" || normalized == "yes"
+        })
+        .unwrap_or(true);
+
+    IdempotencyConfig {
+        ttl: Duration::from_secs(ttl_sec),
+        max_entries,
+        replay_marker_enabled,
+    }
+}
+
 async fn run_host(
     engine: Arc<ZeneEngine>,
     protocol: &str,
@@ -887,6 +1142,8 @@ async fn run_host(
         Arc::new(Mutex::new(HashMap::new()));
     let inflight_idempotency: Arc<Mutex<HashMap<String, String>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let idempotency_config = read_idempotency_config();
+    let metrics = Arc::new(HostRuntimeMetrics::new());
     let global_slots = Arc::new(Semaphore::new(read_max_concurrency()));
     let input_timeout_ms = read_stdin_timeout_ms(stdin_timeout_ms);
     let mut handled_any_request = false;
@@ -914,7 +1171,7 @@ async fn run_host(
 
         handled_any_request = true;
 
-        prune_idempotency_cache(&idempotency_store).await;
+        prune_idempotency_cache(&idempotency_store, idempotency_config).await;
 
         let req: HostRequest = match serde_json::from_str(&line) {
             Ok(v) => v,
@@ -981,8 +1238,10 @@ async fn run_host(
                 };
 
                 if let Some(run_id) = engine_run_id {
+                    metrics.mark_cancel_attempt();
                     let cancelled = engine.cancel_run(&run_id).await;
                     if !cancelled {
+                        metrics.log_snapshot("cancel_rejected");
                         write_invalid_request(
                             &out_tx,
                             &req.request_id,
@@ -993,6 +1252,8 @@ async fn run_host(
                         .await?;
                         continue;
                     }
+                    metrics.mark_cancel_success();
+                    metrics.log_snapshot("cancel_accepted");
 
                     let ack = json!({
                         "protocol_version": 1,
@@ -1033,6 +1294,8 @@ async fn run_host(
                     active_runs.clone(),
                     idempotency_store.clone(),
                     inflight_idempotency.clone(),
+                    idempotency_config,
+                    metrics.clone(),
                     global_slots.clone(),
                     !single_request,
                     single_request,

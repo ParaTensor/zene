@@ -11,6 +11,10 @@ Design goals:
 - Process may exit after response.
 - No event stream in MVP.
 
+For clawbridge command-provider integration, use one-shot main path by default:
+- `zene host --protocol v1 --bridge-compat --single-request`
+- stream/event protocol should be treated as advanced mode only
+
 ## Transport Rules
 
 - stdin: one JSON object per line (NDJSON input).
@@ -94,9 +98,10 @@ The process must not panic on bad input.
 
 ## Exit Code Semantics (recommended)
 
-- `0`: response completed (including structured business error response).
+- `0`: structured response completed (including structured business error response).
 - `2`: protocol/input error before request execution.
-- `3`: runtime/config/provider initialization failure.
+- `3`: preflight/config/provider initialization failure.
+- `4`: runtime failure where host/engine cannot finish normal structured handling.
 
 Note:
 - clawbridge should trust stdout JSON first; exit code is secondary signal for operations.

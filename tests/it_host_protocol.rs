@@ -160,6 +160,39 @@ fn test_host_inflight_idempotency_dedup() {
 }
 
 #[test]
+fn test_host_idempotency_replay_reuses_response_with_replayed_marker() {
+    let mut host = start_host();
+
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_replay_a\",\"session_id\":\"s_replay\",\"prompt\":\"hello\",\"timeout_ms\":2000,\"idempotency_key\":\"k_replay\",\"stream\":false}",
+    );
+
+    let mut first_final = None;
+    for _ in 0..8 {
+        let msg = host.recv_json(2_000);
+        if msg["type"] == "final" && msg["request_id"] == "r_replay_a" {
+            first_final = Some(msg);
+            break;
+        }
+    }
+    let first_final = first_final.expect("missing first terminal final");
+
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_replay_b\",\"session_id\":\"s_replay\",\"prompt\":\"hello\",\"timeout_ms\":2000,\"idempotency_key\":\"k_replay\",\"stream\":false}",
+    );
+
+    let replay = host.recv_json(2_000);
+    assert_eq!(replay["type"], "final");
+    assert_eq!(replay["request_id"], "r_replay_b");
+    assert_eq!(replay["session_id"], "s_replay");
+    assert_eq!(replay["replayed"], true);
+    assert_eq!(replay["status"], first_final["status"]);
+    assert_eq!(replay["text"], first_final["text"]);
+
+    host.shutdown();
+}
+
+#[test]
 fn test_host_cancel_emits_single_terminal_final() {
     let mut host = start_host();
 

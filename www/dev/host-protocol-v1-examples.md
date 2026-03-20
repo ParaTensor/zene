@@ -2,6 +2,10 @@
 
 This document is the official integration example set for clawbridge -> zene host mode.
 
+Note:
+- clawbridge command-provider MVP default path is one-shot bridge-compatible mode (`host + --bridge-compat + --single-request`).
+- the stream/event examples below are advanced mode references.
+
 ## Transport Rules
 
 - stdin: NDJSON (one JSON object per line)

@@ -2,6 +2,10 @@
 
 This table defines deterministic handling for command-provider integration.
 
+Routing contract:
+- clawbridge must route by structured `error_code` only.
+- do not rely on free-text `error_message` keyword matching for degrade decisions.
+
 ## Mapping Table
 
 | error_code | Meaning | clawbridge action | Retry | Fallback template |
