@@ -8,6 +8,32 @@ Status legend:
 
 This document is the execution baseline for replacing the current Copilot CLI login chain with Zene in clawlink/clawops/clawbridge.
 
+## MVP Locked Scope (Clawlink First)
+
+Target chain:
+- `QQ -> clawlink -> clawops -> clawbridge(command) -> zene -> clawops -> QQ`
+- No Copilot login dependency.
+
+In-scope for this phase:
+- Single-request execution contract over stdin/stdout.
+- One request JSON in, one response JSON out.
+- Stable machine-readable response shape for both success and failure.
+- Structured error codes for clawbridge retry/degrade decisions.
+- Hard timeout and resource cleanup on timeout/failure.
+- Session isolation via `session_id` with minimal persistence.
+
+Explicitly deferred:
+- Event streaming (`event`, thought delta, planning trace).
+- Complex multi-provider routing policy.
+- Heavy observability stack beyond minimum request tracing fields.
+- Advanced context compression and TTL automation.
+
+MVP acceptance bar:
+- 1000 consecutive requests with 100% JSON-parseable stdout.
+- Timeout requests return `TIMEOUT` with no stuck execution.
+- Same session keeps context; different sessions do not cross-talk.
+- Provider outage paths map cleanly to fallback strategy.
+
 ## Goals
 
 - Stabilize Zene as a hosted, observable, recoverable backend.
@@ -226,9 +252,10 @@ This document is the execution baseline for replacing the current Copilot CLI lo
 
 ## Immediate Next Sprint (recommended)
 
-- [~] Implement A1 and A2 end-to-end with integration test harness.
-- [x] Define the official `v1` JSON examples for clawbridge team.
-- [ ] Add temporary compatibility adapter if old run mode is still needed.
+- [~] Freeze MVP protocol shape for command provider contract (single request -> single JSON response).
+- [x] Define the official Host v1 examples for clawbridge team.
+- [~] Complete minimum timeout/cleanup/exit semantics for production command execution.
+- [ ] Finalize clawbridge fallback mapping tests for `PROVIDER_DOWN` and `TIMEOUT`.
 
 ## Execution Log
 
