@@ -2,6 +2,9 @@
 name = "zene-worker"
 version = "0.1.0"
 edition = "2021"
+description = "Worker runtime for Zene host and execution loop integration."
+license = "MIT"
+repository = "https://github.com/ParaTensor/zene"
 
 [dependencies]
 zene-core = { workspace = true }
