@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.4] - 2026-03-20
+
+### Fixed
+- **Docs Build Stability**: Fixed unresolved architecture image reference in VitePress docs to restore CI/CD deployment to Cloudflare.
+
+### Changed
+- **Release Rollup**: Published follow-up patch release after docs pipeline recovery.
+
 ## [0.6.3] - 2026-03-20
 
 ### Changed
