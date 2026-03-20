@@ -47,7 +47,16 @@ enum Commands {
         /// Timeout for waiting first/next stdin line
         #[arg(long)]
         stdin_timeout_ms: Option<u64>,
+        /// Emit clawbridge-friendly flat response JSON shape
+        #[arg(long, default_value_t = false)]
+        bridge_compat: bool,
     },
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum HostResponseMode {
+    Protocol,
+    BridgeCompat,
 }
 
 #[derive(Debug, Deserialize)]
@@ -216,12 +225,92 @@ fn build_final_payload(
     })
 }
 
+fn bridge_compat_from_protocol(payload: &serde_json::Value) -> serde_json::Value {
+    let request_id = payload
+        .get("request_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    let session_id = payload
+        .get("session_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let status = payload
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("ERROR");
+    let text = payload.get("text").and_then(|v| v.as_str()).unwrap_or("");
+
+    if status == "OK" {
+        return json!({
+            "ok": true,
+            "request_id": request_id,
+            "session_id": session_id,
+            "text": text,
+            "error_code": serde_json::Value::Null,
+            "error_message": serde_json::Value::Null,
+            "usage": payload.get("usage").cloned().unwrap_or_else(|| json!({}))
+        });
+    }
+
+    let error_code = payload
+        .get("error")
+        .and_then(|e| e.get("code"))
+        .cloned()
+        .unwrap_or_else(|| json!("INTERNAL"));
+    let error_message = payload
+        .get("error")
+        .and_then(|e| e.get("message"))
+        .cloned()
+        .unwrap_or_else(|| json!("request failed"));
+
+    json!({
+        "ok": false,
+        "request_id": request_id,
+        "session_id": session_id,
+        "text": "",
+        "error_code": error_code,
+        "error_message": error_message,
+        "usage": payload.get("usage").cloned().unwrap_or_else(|| json!({
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0
+        }))
+    })
+}
+
+fn bridge_compat_error(
+    request_id: &str,
+    session_id: Option<&str>,
+    code: &str,
+    message: &str,
+) -> serde_json::Value {
+    json!({
+        "ok": false,
+        "request_id": request_id,
+        "session_id": session_id.unwrap_or(""),
+        "text": "",
+        "error_code": code,
+        "error_message": message,
+        "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0
+        }
+    })
+}
+
 async fn write_invalid_request(
     tx: &mpsc::UnboundedSender<serde_json::Value>,
     request_id: &str,
     session_id: Option<&str>,
     message: &str,
+    response_mode: HostResponseMode,
 ) -> anyhow::Result<()> {
+    if response_mode == HostResponseMode::BridgeCompat {
+        let payload = bridge_compat_error(request_id, session_id, "INVALID_REQUEST", message);
+        return send_protocol_line(tx, payload).await;
+    }
+
     let payload = json!({
         "protocol_version": 1,
         "type": "error",
@@ -237,7 +326,18 @@ async fn write_busy_response(
     tx: &mpsc::UnboundedSender<serde_json::Value>,
     request_id: &str,
     session_id: Option<&str>,
+    response_mode: HostResponseMode,
 ) -> anyhow::Result<()> {
+    if response_mode == HostResponseMode::BridgeCompat {
+        let payload = bridge_compat_error(
+            request_id,
+            session_id,
+            "BUSY",
+            "server is overloaded; retry later",
+        );
+        return send_protocol_line(tx, payload).await;
+    }
+
     let payload = json!({
         "protocol_version": 1,
         "type": "error",
@@ -263,6 +363,7 @@ async fn handle_run_request(
     global_slots: Arc<Semaphore>,
     emit_ack: bool,
     allow_orphan_terminal: bool,
+    response_mode: HostResponseMode,
     req: HostRequest,
 ) -> anyhow::Result<()> {
     let request_id = req.request_id.clone();
@@ -275,6 +376,7 @@ async fn handle_run_request(
                 &request_id,
                 None,
                 "run request requires non-empty session_id",
+                response_mode,
             )
             .await;
         }
@@ -288,6 +390,7 @@ async fn handle_run_request(
                 &request_id,
                 Some(&session_id),
                 "run request requires non-empty prompt",
+                response_mode,
             )
             .await;
         }
@@ -301,6 +404,7 @@ async fn handle_run_request(
                 &request_id,
                 Some(&session_id),
                 "run request requires non-empty idempotency_key",
+                response_mode,
             )
             .await;
         }
@@ -314,6 +418,7 @@ async fn handle_run_request(
                 &request_id,
                 Some(&session_id),
                 "request_id is already in progress",
+                response_mode,
             )
             .await;
         }
@@ -358,7 +463,7 @@ async fn handle_run_request(
     let global_permit = match global_slots.clone().try_acquire_owned() {
         Ok(permit) => permit,
         Err(_) => {
-            return write_busy_response(&tx, &request_id, Some(&session_id)).await;
+            return write_busy_response(&tx, &request_id, Some(&session_id), response_mode).await;
         }
     };
 
@@ -521,7 +626,12 @@ async fn handle_run_request(
             );
         }
 
-        let _ = send_protocol_line(&task_tx, final_payload).await;
+        let outbound = if response_mode == HostResponseMode::BridgeCompat {
+            bridge_compat_from_protocol(&final_payload)
+        } else {
+            final_payload
+        };
+        let _ = send_protocol_line(&task_tx, outbound).await;
     });
 
     let mut active = active_runs.lock().await;
@@ -695,6 +805,7 @@ async fn run_host(
     protocol: &str,
     single_request: bool,
     stdin_timeout_ms: Option<u64>,
+    response_mode: HostResponseMode,
 ) -> anyhow::Result<()> {
     if protocol != "v1" {
         anyhow::bail!("unsupported protocol: {}", protocol);
@@ -756,6 +867,7 @@ async fn run_host(
                     "unknown",
                     None,
                     &format!("invalid JSON payload: {}", e),
+                    response_mode,
                 )
                 .await?;
                 anyhow::bail!("PROTOCOL: invalid JSON payload: {}", e);
@@ -768,6 +880,7 @@ async fn run_host(
                 &req.request_id,
                 req.session_id.as_deref(),
                 "unsupported protocol_version (expected 1)",
+                response_mode,
             )
             .await?;
             anyhow::bail!("PROTOCOL: unsupported protocol_version");
@@ -797,6 +910,7 @@ async fn run_host(
                         &req.request_id,
                         req.session_id.as_deref(),
                         "cancel request requires target_request_id or cancel_request_id",
+                        response_mode,
                     )
                     .await?;
                     continue;
@@ -817,6 +931,7 @@ async fn run_host(
                             &req.request_id,
                             req.session_id.as_deref(),
                             "target_request_id is not cancelable",
+                            response_mode,
                         )
                         .await?;
                         continue;
@@ -838,6 +953,7 @@ async fn run_host(
                         &req.request_id,
                         req.session_id.as_deref(),
                         "target_request_id is not running",
+                        response_mode,
                     )
                     .await?;
                 }
@@ -863,6 +979,7 @@ async fn run_host(
                     global_slots.clone(),
                     !single_request,
                     single_request,
+                    response_mode,
                     req,
                 )
                 .await
@@ -884,6 +1001,7 @@ async fn run_host(
                     &req.request_id,
                     req.session_id.as_deref(),
                     "unsupported request type",
+                    response_mode,
                 )
                 .await?;
                 if single_request {
@@ -991,9 +1109,17 @@ async fn main() -> anyhow::Result<()> {
                 protocol,
                 single_request,
                 stdin_timeout_ms,
+                bridge_compat,
             } => {
                 info!("Starting host mode with protocol={}", protocol);
-                if let Err(e) = run_host(engine, &protocol, single_request, stdin_timeout_ms).await
+                let response_mode = if bridge_compat {
+                    HostResponseMode::BridgeCompat
+                } else {
+                    HostResponseMode::Protocol
+                };
+                if let Err(e) =
+                    run_host(engine, &protocol, single_request, stdin_timeout_ms, response_mode)
+                        .await
                 {
                     let message = e.to_string();
                     error!("Host failed: {}", message);

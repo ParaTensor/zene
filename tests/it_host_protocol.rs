@@ -294,3 +294,44 @@ fn test_host_single_request_mode_emits_one_json_line() {
     let msg: Value = serde_json::from_str(lines[0]).expect("stdout line must be valid json");
     assert_eq!(msg["type"], "final");
 }
+
+#[test]
+fn test_host_bridge_compat_single_response_shape() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zene"))
+        .arg("host")
+        .arg("--protocol")
+        .arg("v1")
+        .arg("--bridge-compat")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("failed to spawn bridge-compat host");
+
+    {
+        let mut stdin = child.stdin.take().expect("missing stdin");
+        writeln!(
+            stdin,
+            "{{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_bridge\",\"session_id\":\"s_bridge\",\"prompt\":\"bridge shape\",\"timeout_ms\":2000,\"idempotency_key\":\"k_bridge\"}}"
+        )
+        .expect("failed to write bridge request");
+        stdin.flush().expect("failed to flush bridge request");
+    }
+
+    let output = child
+        .wait_with_output()
+        .expect("failed waiting for bridge-compat host output");
+    assert!(output.status.success(), "bridge-compat host exited with non-zero status");
+
+    let stdout_text = String::from_utf8(output.stdout).expect("stdout should be valid utf8");
+    let lines: Vec<&str> = stdout_text.lines().filter(|l| !l.trim().is_empty()).collect();
+    assert_eq!(lines.len(), 1, "expected exactly one stdout JSON line");
+
+    let msg: Value = serde_json::from_str(lines[0]).expect("stdout line must be valid json");
+    assert!(msg.get("type").is_none(), "bridge format should not include protocol type");
+    assert!(msg.get("ok").is_some(), "bridge format should include ok field");
+    assert!(msg.get("text").is_some(), "bridge format should include text field");
+    assert!(msg.get("error_code").is_some(), "bridge format should include error_code field");
+    assert!(msg.get("error_message").is_some(), "bridge format should include error_message field");
+    assert!(msg.get("usage").is_some(), "bridge format should include usage field");
+}

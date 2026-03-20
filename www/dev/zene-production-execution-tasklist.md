@@ -299,3 +299,7 @@ MVP acceptance bar:
 - Added semantic non-zero exit code mapping for protocol errors (`2`) and runtime errors (`4`).
 - Expanded host integration tests to 7 cases, including default single-request one-line JSON response verification.
 - Re-verified `cargo test --test it_host_protocol` passes (7/7).
+- Added `--bridge-compat` host response mode for clawbridge-friendly flat JSON (`ok`, `text`, `error_code`, `error_message`, `usage`).
+- Kept protocol mode as default while enabling bridge-compatible one-shot output path for command provider integration.
+- Expanded host integration tests to 8 cases with bridge-compat shape verification.
+- Re-verified `cargo test --test it_host_protocol` passes (8/8).
