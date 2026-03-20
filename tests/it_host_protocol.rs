@@ -47,8 +47,13 @@ impl HostHarness {
     }
 }
 
-fn start_host() -> HostHarness {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_zene"))
+fn start_host_with_max_concurrency(max_concurrency: Option<usize>) -> HostHarness {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_zene"));
+    if let Some(limit) = max_concurrency {
+        cmd.env("ZENE_MAX_CONCURRENCY", limit.to_string());
+    }
+
+    let mut child = cmd
         .arg("host")
         .arg("--protocol")
         .arg("v1")
@@ -81,6 +86,10 @@ fn start_host() -> HostHarness {
     });
 
     HostHarness { child, stdin, rx }
+}
+
+fn start_host() -> HostHarness {
+    start_host_with_max_concurrency(None)
 }
 
 fn count_final_for(messages: &[Value], request_id: &str) -> usize {
@@ -222,5 +231,29 @@ fn test_host_timeout_emits_single_terminal_final() {
     assert_eq!(timeout_final["status"], "TIMEOUT");
 
     assert_eq!(count_final_for(&observed, "r_timeout"), 1);
+    host.shutdown();
+}
+
+#[test]
+fn test_host_returns_busy_when_global_limit_reached() {
+    let mut host = start_host_with_max_concurrency(Some(1));
+
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_busy_a\",\"session_id\":\"s_busy\",\"prompt\":\"hold capacity\",\"timeout_ms\":120000,\"idempotency_key\":\"k_busy_a\",\"stream\":false}",
+    );
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_busy_b\",\"session_id\":\"s_busy\",\"prompt\":\"should be rejected\",\"timeout_ms\":120000,\"idempotency_key\":\"k_busy_b\",\"stream\":false}",
+    );
+
+    let mut observed = vec![host.recv_json(2_000), host.recv_json(2_000)];
+    observed.extend(host.collect_for(500));
+
+    let busy_error = observed
+        .iter()
+        .find(|m| m["type"] == "error" && m["request_id"] == "r_busy_b")
+        .expect("missing busy rejection for second request");
+    assert_eq!(busy_error["error"]["code"], "BUSY");
+    assert_eq!(busy_error["error"]["http_status"], 429);
+
     host.shutdown();
 }

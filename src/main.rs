@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex, Semaphore};
 use tokio::time::{timeout, Duration};
 use tracing::{error, info};
 
@@ -223,12 +223,34 @@ async fn write_invalid_request(
     send_protocol_line(tx, payload).await
 }
 
+async fn write_busy_response(
+    tx: &mpsc::UnboundedSender<serde_json::Value>,
+    request_id: &str,
+    session_id: Option<&str>,
+) -> anyhow::Result<()> {
+    let payload = json!({
+        "protocol_version": 1,
+        "type": "error",
+        "request_id": request_id,
+        "session_id": session_id,
+        "ts_ms": now_ts_ms(),
+        "error": {
+            "code": "BUSY",
+            "message": "server is overloaded; retry later",
+            "retryable": true,
+            "http_status": 429
+        }
+    });
+    send_protocol_line(tx, payload).await
+}
+
 async fn handle_run_request(
     engine: Arc<ZeneEngine>,
     tx: mpsc::UnboundedSender<serde_json::Value>,
     active_runs: Arc<Mutex<HashMap<String, ActiveRun>>>,
     idempotency_store: Arc<Mutex<HashMap<String, IdempotencyEntry>>>,
     inflight_idempotency: Arc<Mutex<HashMap<String, String>>>,
+    global_slots: Arc<Semaphore>,
     req: HostRequest,
 ) -> anyhow::Result<()> {
     let request_id = req.request_id.clone();
@@ -321,6 +343,13 @@ async fn handle_run_request(
         }
     }
 
+    let global_permit = match global_slots.clone().try_acquire_owned() {
+        Ok(permit) => permit,
+        Err(_) => {
+            return write_busy_response(&tx, &request_id, Some(&session_id)).await;
+        }
+    };
+
     let request_ts = req.ts_ms.unwrap_or_else(now_ts_ms);
     let timeout_ms = req.timeout_ms.unwrap_or(120_000);
     let stream = req.stream.unwrap_or(true);
@@ -401,6 +430,7 @@ async fn handle_run_request(
     let run_token_for_map = task_run_token.clone();
 
     let handle = tokio::spawn(async move {
+        let _global_permit = global_permit;
         let started_at = std::time::Instant::now();
         let terminal_snapshot = timeout(
             Duration::from_millis(timeout_ms),
@@ -647,6 +677,14 @@ async fn prune_idempotency_cache(store: &Arc<Mutex<HashMap<String, IdempotencyEn
     }
 }
 
+fn read_max_concurrency() -> usize {
+    std::env::var("ZENE_MAX_CONCURRENCY")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(8)
+}
+
 async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()> {
     if protocol != "v1" {
         anyhow::bail!("unsupported protocol: {}", protocol);
@@ -671,6 +709,7 @@ async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()>
         Arc::new(Mutex::new(HashMap::new()));
     let inflight_idempotency: Arc<Mutex<HashMap<String, String>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let global_slots = Arc::new(Semaphore::new(read_max_concurrency()));
 
     while let Some(line) = lines.next_line().await? {
         if line.trim().is_empty() {
@@ -791,6 +830,7 @@ async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()>
                     active_runs.clone(),
                     idempotency_store.clone(),
                     inflight_idempotency.clone(),
+                    global_slots.clone(),
                     req,
                 )
                 .await

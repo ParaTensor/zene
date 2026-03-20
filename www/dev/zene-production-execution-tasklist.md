@@ -117,12 +117,15 @@ This document is the execution baseline for replacing the current Copilot CLI lo
   - Upstream can render progress states without waiting final output.
 
 ### Story B3: Concurrency governance and backpressure
-- [ ] Add global concurrency limit.
+- [x] Add global concurrency limit.
 - [ ] Enforce single-flight per session.
 - [ ] Add bounded queue and queue wait timeout.
-- [ ] Return BUSY/429 when overloaded.
+- [x] Return BUSY/429 when overloaded.
 - Acceptance:
   - Burst traffic degrades gracefully without runaway memory growth.
+  - Notes:
+    - Host now enforces a global in-flight run cap via `ZENE_MAX_CONCURRENCY` (default `8`) using semaphore admission control.
+    - Over-capacity `run` requests are rejected immediately with structured `error.code=BUSY` and `http_status=429`.
 
 ### Story B4: Provider routing and fallback
 - [ ] Add primary/secondary provider policy.
@@ -259,3 +262,7 @@ This document is the execution baseline for replacing the current Copilot CLI lo
 - Re-verified with `cargo check`, `cargo test --bin zene`, and `cargo test --test it_host_protocol`.
 - Expanded host integration tests to 5 cases, adding terminal uniqueness coverage for timeout and cancel flows.
 - Re-verified `cargo test --test it_host_protocol` passes (5/5).
+- Added host global concurrency admission control (`ZENE_MAX_CONCURRENCY`, default `8`).
+- Added structured overload rejection payload (`BUSY` + `http_status=429`) for saturated capacity.
+- Expanded host integration tests to 6 cases, including overload rejection verification.
+- Re-verified with `cargo check` and `cargo test --test it_host_protocol` (6/6).
