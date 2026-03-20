@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2] - 2026-03-20
+
+### Added
+- **Host MVP One-Shot Mode**: Added default single-request host execution for command-provider workflows.
+- **Bridge Compatibility Output**: Added `--bridge-compat` flat JSON response mode (`ok`, `text`, `error_code`, `error_message`, `usage`) for easier clawbridge integration.
+- **Preflight Command**: Added `zene self-test` command with machine-readable JSON report.
+- **Overload Guard**: Added global concurrency gate with BUSY/429 style structured rejection.
+
+### Changed
+- **Protocol Output Scope**: Disabled event stream emission in MVP path; host now focuses on terminal structured response for one-shot runs.
+- **Process Exit Semantics**: Added semantic non-zero exits for protocol-class and runtime-class failures.
+- **Input Robustness**: Added stdin read timeout handling to avoid hung processes in command mode.
+
+### Fixed
+- **Terminal Final Uniqueness**: Hardened timeout/cancel flows to avoid duplicate terminal final responses.
+- **Error Mapping Consistency**: Host now prioritizes typed snapshot error code mapping before fallback heuristics.
+
 ## [0.6.1] - 2026-03-01
 
 ### Changed
