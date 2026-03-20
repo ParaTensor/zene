@@ -70,14 +70,14 @@ This document is the execution baseline for replacing the current Copilot CLI lo
 - [x] Add request-level timeout enforcement.
 - [x] Add cancel message handling by request_id.
 - [x] Propagate cancellation into model/tool execution pipeline.
-- [~] Ensure canceled/timed-out runs emit single terminal final state.
+- [x] Ensure canceled/timed-out runs emit single terminal final state.
 - Acceptance:
   - Timeout returns final status TIMEOUT and stops execution.
   - Cancel returns final status CANCELED and stops execution.
   - Notes:
     - Host now resolves target requests to engine `run_id` and forwards cancellation through `engine.cancel_run(...)`.
     - Timeout path now also triggers `engine.cancel_run(...)` to stop deep execution instead of only timing out the host wait path.
-    - Single-terminal-state hardening remains in progress with additional end-to-end scenario coverage.
+    - Added end-to-end protocol tests to verify single terminal `final` emission for timeout and cancel race conditions.
 
 ### Story A5: Session isolation and persistence policy
 - [ ] Treat session_id as first-class key in all execution paths.
@@ -257,3 +257,5 @@ This document is the execution baseline for replacing the current Copilot CLI lo
 - Updated host final error mapping to prioritize snapshot `error_code` over message heuristics.
 - Added unit tests for snapshot-based error mapping and final-state shaping in `src/main.rs`.
 - Re-verified with `cargo check`, `cargo test --bin zene`, and `cargo test --test it_host_protocol`.
+- Expanded host integration tests to 5 cases, adding terminal uniqueness coverage for timeout and cancel flows.
+- Re-verified `cargo test --test it_host_protocol` passes (5/5).

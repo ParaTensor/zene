@@ -1,8 +1,53 @@
 use serde_json::Value;
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::mpsc::{self, Receiver};
+use std::thread;
+use std::time::{Duration, Instant};
 
-fn start_host() -> (Child, ChildStdin, BufReader<ChildStdout>) {
+struct HostHarness {
+    child: Child,
+    stdin: ChildStdin,
+    rx: Receiver<Value>,
+}
+
+impl HostHarness {
+    fn send_line(&mut self, line: &str) {
+        writeln!(self.stdin, "{}", line).expect("failed to write request");
+        self.stdin.flush().expect("failed to flush request");
+    }
+
+    fn recv_json(&self, timeout_ms: u64) -> Value {
+        self.rx
+            .recv_timeout(Duration::from_millis(timeout_ms))
+            .expect("timed out waiting for host protocol line")
+    }
+
+    fn collect_for(&self, wait_ms: u64) -> Vec<Value> {
+        let deadline = Instant::now() + Duration::from_millis(wait_ms);
+        let mut out = Vec::new();
+        loop {
+            let now = Instant::now();
+            if now >= deadline {
+                break;
+            }
+            let remain = deadline.saturating_duration_since(now);
+            match self.rx.recv_timeout(remain.min(Duration::from_millis(30))) {
+                Ok(msg) => out.push(msg),
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+        out
+    }
+
+    fn shutdown(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+fn start_host() -> HostHarness {
     let mut child = Command::new(env!("CARGO_BIN_EXE_zene"))
         .arg("host")
         .arg("--protocol")
@@ -15,77 +60,83 @@ fn start_host() -> (Child, ChildStdin, BufReader<ChildStdout>) {
 
     let stdin = child.stdin.take().expect("missing stdin");
     let stdout = child.stdout.take().expect("missing stdout");
-    (child, stdin, BufReader::new(stdout))
+
+    let (tx, rx) = mpsc::channel::<Value>();
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        loop {
+            let mut line = String::new();
+            match reader.read_line(&mut line) {
+                Ok(0) => break,
+                Ok(_) => {
+                    if let Ok(msg) = serde_json::from_str::<Value>(line.trim()) {
+                        if tx.send(msg).is_err() {
+                            break;
+                        }
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    HostHarness { child, stdin, rx }
 }
 
-fn read_json_line(reader: &mut BufReader<ChildStdout>) -> Value {
-    let mut line = String::new();
-    reader
-        .read_line(&mut line)
-        .expect("failed to read protocol line");
-    serde_json::from_str::<Value>(line.trim()).expect("invalid JSON output")
+fn count_final_for(messages: &[Value], request_id: &str) -> usize {
+    messages
+        .iter()
+        .filter(|m| m["type"] == "final" && m["request_id"] == request_id)
+        .count()
 }
 
 #[test]
 fn test_host_ping_ack() {
-    let (mut child, mut stdin, mut stdout) = start_host();
+    let mut host = start_host();
 
-    writeln!(
-        stdin,
-        "{{\"protocol_version\":1,\"type\":\"ping\",\"request_id\":\"p_test\",\"session_id\":\"s_test\"}}"
-    )
-    .expect("failed to write request");
-    stdin.flush().expect("failed to flush request");
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"ping\",\"request_id\":\"p_test\",\"session_id\":\"s_test\"}",
+    );
 
-    let msg = read_json_line(&mut stdout);
+    let msg = host.recv_json(1_000);
 
     assert_eq!(msg["type"], "ack");
     assert_eq!(msg["status"], "PONG");
     assert_eq!(msg["request_id"], "p_test");
 
-    let _ = child.kill();
-    let _ = child.wait();
+    host.shutdown();
 }
 
 #[test]
 fn test_host_cancel_requires_target() {
-    let (mut child, mut stdin, mut stdout) = start_host();
+    let mut host = start_host();
 
-    writeln!(
-        stdin,
-        "{{\"protocol_version\":1,\"type\":\"cancel\",\"request_id\":\"c_test\",\"session_id\":\"s_test\"}}"
-    )
-    .expect("failed to write request");
-    stdin.flush().expect("failed to flush request");
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"cancel\",\"request_id\":\"c_test\",\"session_id\":\"s_test\"}",
+    );
 
-    let msg = read_json_line(&mut stdout);
+    let msg = host.recv_json(1_000);
 
     assert_eq!(msg["type"], "error");
     assert_eq!(msg["error"]["code"], "INVALID_REQUEST");
     assert_eq!(msg["request_id"], "c_test");
 
-    let _ = child.kill();
-    let _ = child.wait();
+    host.shutdown();
 }
 
 #[test]
 fn test_host_inflight_idempotency_dedup() {
-    let (mut child, mut stdin, mut stdout) = start_host();
+    let mut host = start_host();
 
-    writeln!(
-        stdin,
-        "{{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_a\",\"session_id\":\"s_test\",\"prompt\":\"hello\",\"timeout_ms\":500,\"idempotency_key\":\"k_test\",\"stream\":false}}"
-    )
-    .expect("failed to write first run request");
-    writeln!(
-        stdin,
-        "{{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_b\",\"session_id\":\"s_test\",\"prompt\":\"hello\",\"timeout_ms\":500,\"idempotency_key\":\"k_test\",\"stream\":false}}"
-    )
-    .expect("failed to write second run request");
-    stdin.flush().expect("failed to flush run requests");
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_a\",\"session_id\":\"s_test\",\"prompt\":\"hello\",\"timeout_ms\":500,\"idempotency_key\":\"k_test\",\"stream\":false}"
+    );
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_b\",\"session_id\":\"s_test\",\"prompt\":\"hello\",\"timeout_ms\":500,\"idempotency_key\":\"k_test\",\"stream\":false}"
+    );
 
-    let msg1 = read_json_line(&mut stdout);
-    let msg2 = read_json_line(&mut stdout);
+    let msg1 = host.recv_json(1_500);
+    let msg2 = host.recv_json(1_500);
 
     assert_eq!(msg1["type"], "ack");
     assert_eq!(msg1["status"], "ACCEPTED");
@@ -94,6 +145,82 @@ fn test_host_inflight_idempotency_dedup() {
     assert_eq!(msg2["status"], "DUPLICATE_IN_PROGRESS");
     assert_eq!(msg2["existing_request_id"], "r_a");
 
-    let _ = child.kill();
-    let _ = child.wait();
+    host.shutdown();
+}
+
+#[test]
+fn test_host_cancel_emits_single_terminal_final() {
+    let mut host = start_host();
+
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_cancel\",\"session_id\":\"s_cancel\",\"prompt\":\"long running cancel test\",\"timeout_ms\":120000,\"idempotency_key\":\"k_cancel\",\"stream\":false}",
+    );
+
+    let ack = host.recv_json(2_000);
+    assert_eq!(ack["type"], "ack");
+    assert_eq!(ack["status"], "ACCEPTED");
+
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"cancel\",\"request_id\":\"c_cancel\",\"session_id\":\"s_cancel\",\"target_request_id\":\"r_cancel\"}",
+    );
+
+    let mut observed = vec![host.recv_json(2_000), host.recv_json(2_000)];
+    observed.extend(host.collect_for(500));
+
+    let maybe_cancel_ack = observed
+        .iter()
+        .find(|m| m["type"] == "ack" && m["request_id"] == "c_cancel");
+
+    let final_count = count_final_for(&observed, "r_cancel");
+    assert!(final_count <= 1, "expected at most one final, got {}", final_count);
+
+    let target_final = observed
+        .iter()
+        .find(|m| m["type"] == "final" && m["request_id"] == "r_cancel")
+        .expect("missing target final");
+
+    if let Some(cancel_ack) = maybe_cancel_ack {
+        assert_eq!(cancel_ack["status"], "CANCEL_ACCEPTED");
+        assert_eq!(target_final["status"], "CANCELED");
+    } else {
+        let cancel_error = observed
+            .iter()
+            .find(|m| m["type"] == "error" && m["request_id"] == "c_cancel")
+            .expect("missing cancel response");
+        assert_eq!(cancel_error["error"]["code"], "INVALID_REQUEST");
+    }
+
+    host.shutdown();
+}
+
+#[test]
+fn test_host_timeout_emits_single_terminal_final() {
+    let mut host = start_host();
+
+    host.send_line(
+        "{\"protocol_version\":1,\"type\":\"run\",\"request_id\":\"r_timeout\",\"session_id\":\"s_timeout\",\"prompt\":\"force timeout\",\"timeout_ms\":1,\"idempotency_key\":\"k_timeout\",\"stream\":false}",
+    );
+
+    let mut observed = Vec::new();
+    observed.push(host.recv_json(2_000));
+
+    loop {
+        let msg = host.recv_json(3_000);
+        let is_target_final = msg["type"] == "final" && msg["request_id"] == "r_timeout";
+        observed.push(msg);
+        if is_target_final {
+            break;
+        }
+    }
+
+    observed.extend(host.collect_for(500));
+
+    let timeout_final = observed
+        .iter()
+        .find(|m| m["type"] == "final" && m["request_id"] == "r_timeout")
+        .expect("missing timeout final");
+    assert_eq!(timeout_final["status"], "TIMEOUT");
+
+    assert_eq!(count_final_for(&observed, "r_timeout"), 1);
+    host.shutdown();
 }
