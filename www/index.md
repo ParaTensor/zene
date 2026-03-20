@@ -10,6 +10,9 @@ hero:
       text: Get Started
       link: /guide/getting-started
     - theme: alt
+      text: Dev Docs
+      link: /dev/
+    - theme: alt
       text: View on GitHub
       link: https://github.com/lipish/zene
     - theme: alt
@@ -58,3 +61,11 @@ zene --version
 ```
 
 [Read the Documentation →](/guide/getting-started)
+
+[Open Dev Integration Docs →](/dev/)
+
+## Integration Shortcuts
+
+- [Clawbridge Command Provider Quickstart (MVP)](/dev/clawbridge-command-provider-quickstart)
+- [Host Protocol v1 (MVP)](/dev/zene-host-protocol-v1-mvp)
+- [Error Code Degrade Matrix (MVP)](/dev/zene-error-code-degrade-matrix)
