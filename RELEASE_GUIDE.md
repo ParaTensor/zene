@@ -21,6 +21,8 @@ Edit `Cargo.toml` and update the version number:
 version = "0.1.0"  # Update this
 ```
 
+If using workspace path dependencies, ensure each publishable internal dependency also has an explicit `version` requirement (for example `{ path = "...", version = "x.y.z" }`).
+
 Commit the change:
 
 ```bash

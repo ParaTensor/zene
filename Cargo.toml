@@ -16,8 +16,8 @@ members = [
 ]
 
 [workspace.dependencies]
-zene-core = { path = "crates/zene-core" }
-zene-worker = { path = "crates/zene-worker" }
+zene-core = { path = "crates/zene-core", version = "0.6.5" }
+zene-worker = { path = "crates/zene-worker", version = "0.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.36", features = ["full"] }
