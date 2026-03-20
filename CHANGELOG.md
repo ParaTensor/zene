@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.3] - 2026-03-20
+
+### Changed
+- **Release Rollup**: Published a follow-up patch release for stabilized command-mode integration workflow.
+- **Integration Guidance**: Consolidated clawbridge command-provider quickstart usage for one-shot bridge-compatible execution.
+
 ## [0.6.2] - 2026-03-20
 
 ### Added
