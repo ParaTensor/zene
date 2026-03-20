@@ -12,11 +12,13 @@ use tracing::{error, info};
 
 use zene_core::config::AgentConfig;
 use zene_core::engine::session::store::FileSessionStore;
+use zene_core::agent::AgentClient;
 use zene_core::{ExecutionStrategy, RunRequest, RunSnapshot, RunStatus, ZeneEngine};
 use zene_worker::Worker;
 
 const EXIT_OK: i32 = 0;
 const EXIT_PROTOCOL_ERROR: i32 = 2;
+const EXIT_CONFIG_ERROR: i32 = 3;
 const EXIT_RUNTIME_ERROR: i32 = 4;
 
 #[derive(Parser)]
@@ -36,6 +38,8 @@ enum Commands {
     },
     /// Run one request from stdin and stream JSONL events to stdout
     Worker,
+    /// Run minimal health checks and print one JSON result
+    SelfTest,
     /// Run as a host worker process using NDJSON over stdin/stdout
     Host {
         /// Protocol version name, currently only v1 is supported
@@ -51,6 +55,59 @@ enum Commands {
         #[arg(long, default_value_t = false)]
         bridge_compat: bool,
     },
+}
+
+fn redact_secret(value: &str) -> String {
+    if value.is_empty() {
+        return "".to_string();
+    }
+    if value.len() <= 4 {
+        return "****".to_string();
+    }
+    let suffix = &value[value.len() - 4..];
+    format!("****{}", suffix)
+}
+
+fn run_self_test(config: &AgentConfig) -> serde_json::Value {
+    let mut checks = Vec::new();
+
+    let roles = [
+        ("planner", &config.planner),
+        ("executor", &config.executor),
+        ("reflector", &config.reflector),
+    ];
+
+    for (role, cfg) in roles {
+        let api_key_present = !cfg.api_key.trim().is_empty();
+        let provider = cfg.provider.clone();
+        let model = cfg.model.clone();
+
+        let client_init = AgentClient::new(cfg);
+        let (ok, error_message) = match client_init {
+            Ok(_) => (api_key_present, if api_key_present { None } else { Some("api_key is empty".to_string()) }),
+            Err(e) => (false, Some(e.to_string())),
+        };
+
+        checks.push(json!({
+            "role": role,
+            "provider": provider,
+            "model": model,
+            "api_key_present": api_key_present,
+            "api_key_hint": redact_secret(&cfg.api_key),
+            "ok": ok,
+            "error": error_message,
+        }));
+    }
+
+    let all_ok = checks
+        .iter()
+        .all(|c| c.get("ok").and_then(|v| v.as_bool()).unwrap_or(false));
+
+    json!({
+        "ok": all_ok,
+        "status": if all_ok { "PASS" } else { "FAIL" },
+        "checks": checks,
+    })
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -1060,6 +1117,18 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
+    let cli = Cli::parse();
+
+    if let Some(Commands::SelfTest) = &cli.command {
+        let report = run_self_test(&config);
+        println!("{}", serde_json::to_string(&report)?);
+        let ok = report.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+        if !ok {
+            std::process::exit(EXIT_CONFIG_ERROR);
+        }
+        std::process::exit(EXIT_OK);
+    }
+
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let storage_dir = PathBuf::from(&home).join(".zene/sessions");
     let store = match FileSessionStore::new(storage_dir) {
@@ -1076,8 +1145,6 @@ async fn main() -> anyhow::Result<()> {
             std::process::exit(EXIT_RUNTIME_ERROR);
         }
     };
-
-    let cli = Cli::parse();
 
     if let Some(command) = cli.command {
         match command {
@@ -1105,6 +1172,7 @@ async fn main() -> anyhow::Result<()> {
                     std::process::exit(EXIT_RUNTIME_ERROR);
                 }
             }
+            Commands::SelfTest => unreachable!("self-test handled before engine init"),
             Commands::Host {
                 protocol,
                 single_request,

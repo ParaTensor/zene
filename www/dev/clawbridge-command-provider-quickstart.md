@@ -20,6 +20,19 @@ ZENE_STDIN_TIMEOUT_MS=10000
 ZENE_MAX_CONCURRENCY=8
 ```
 
+## Preflight Check
+
+Run self-test before wiring to clawbridge:
+
+```bash
+zene self-test
+```
+
+Expected behavior:
+- stdout prints one JSON report.
+- exit code `0` means config/provider client initialization checks passed.
+- exit code `3` means config/provider check failed (for example missing API key).
+
 ## Request Payload (stdin)
 
 Send one JSON line per invocation:
