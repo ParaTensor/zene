@@ -293,3 +293,9 @@ MVP acceptance bar:
 - Added structured overload rejection payload (`BUSY` + `http_status=429`) for saturated capacity.
 - Expanded host integration tests to 6 cases, including overload rejection verification.
 - Re-verified with `cargo check` and `cargo test --test it_host_protocol` (6/6).
+- Added MVP default single-request host mode (`--single-request=true`) for command-provider one-shot execution.
+- Disabled event stream emission in MVP run path and kept stdout focused on terminal structured response.
+- Added stdin read timeout handling (`--stdin-timeout-ms` / `ZENE_STDIN_TIMEOUT_MS`) with protocol-classified failures.
+- Added semantic non-zero exit code mapping for protocol errors (`2`) and runtime errors (`4`).
+- Expanded host integration tests to 7 cases, including default single-request one-line JSON response verification.
+- Re-verified `cargo test --test it_host_protocol` passes (7/7).

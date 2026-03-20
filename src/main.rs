@@ -15,6 +15,10 @@ use zene_core::engine::session::store::FileSessionStore;
 use zene_core::{ExecutionStrategy, RunRequest, RunSnapshot, RunStatus, ZeneEngine};
 use zene_worker::Worker;
 
+const EXIT_OK: i32 = 0;
+const EXIT_PROTOCOL_ERROR: i32 = 2;
+const EXIT_RUNTIME_ERROR: i32 = 4;
+
 #[derive(Parser)]
 #[command(name = "zene")]
 #[command(about = "A minimalist, high-performance coding engine.", long_about = None)]
@@ -37,6 +41,12 @@ enum Commands {
         /// Protocol version name, currently only v1 is supported
         #[arg(long, default_value = "v1")]
         protocol: String,
+        /// Exit after handling one request (MVP default)
+        #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+        single_request: bool,
+        /// Timeout for waiting first/next stdin line
+        #[arg(long)]
+        stdin_timeout_ms: Option<u64>,
     },
 }
 
@@ -251,6 +261,8 @@ async fn handle_run_request(
     idempotency_store: Arc<Mutex<HashMap<String, IdempotencyEntry>>>,
     inflight_idempotency: Arc<Mutex<HashMap<String, String>>>,
     global_slots: Arc<Semaphore>,
+    emit_ack: bool,
+    allow_orphan_terminal: bool,
     req: HostRequest,
 ) -> anyhow::Result<()> {
     let request_id = req.request_id.clone();
@@ -352,35 +364,23 @@ async fn handle_run_request(
 
     let request_ts = req.ts_ms.unwrap_or_else(now_ts_ms);
     let timeout_ms = req.timeout_ms.unwrap_or(120_000);
-    let stream = req.stream.unwrap_or(true);
+    let stream = req.stream.unwrap_or(false);
 
-    let ack = json!({
-        "protocol_version": 1,
-        "type": "ack",
-        "request_id": request_id,
-        "session_id": session_id,
-        "ts_ms": now_ts_ms(),
-        "status": "ACCEPTED",
-        "request_ts_ms": request_ts
-    });
-    send_protocol_line(&tx, ack).await?;
-
-    if stream {
-        let event = json!({
+    if emit_ack {
+        let ack = json!({
             "protocol_version": 1,
-            "type": "event",
+            "type": "ack",
             "request_id": request_id,
             "session_id": session_id,
             "ts_ms": now_ts_ms(),
-            "event_type": "REQUEST_ACCEPTED",
-            "seq": 1,
-            "payload": {
-                "timeout_ms": timeout_ms,
-                "metadata": req.metadata
-            }
+            "status": "ACCEPTED",
+            "request_ts_ms": request_ts
         });
-        send_protocol_line(&tx, event).await?;
+        send_protocol_line(&tx, ack).await?;
     }
+
+    let _ = stream;
+    let _ = req.metadata;
 
     let run_req = RunRequest {
         prompt,
@@ -454,12 +454,21 @@ async fn handle_run_request(
 
         let should_emit_terminal = {
             let mut active = task_active_runs.lock().await;
-            match active.get(&task_request_id) {
-                Some(run) if run.run_token == task_run_token => {
-                    active.remove(&task_request_id);
-                    true
+            if allow_orphan_terminal {
+                if let Some(run) = active.get(&task_request_id) {
+                    if run.run_token == task_run_token {
+                        active.remove(&task_request_id);
+                    }
                 }
-                _ => false,
+                true
+            } else {
+                match active.get(&task_request_id) {
+                    Some(run) if run.run_token == task_run_token => {
+                        active.remove(&task_request_id);
+                        true
+                    }
+                    _ => false,
+                }
             }
         };
 
@@ -470,20 +479,6 @@ async fn handle_run_request(
         {
             let mut inflight = task_inflight.lock().await;
             inflight.remove(&task_replay_key);
-        }
-
-        if stream {
-            let event = json!({
-                "protocol_version": 1,
-                "type": "event",
-                "request_id": task_request_id,
-                "session_id": task_session_id,
-                "ts_ms": now_ts_ms(),
-                "event_type": "RUN_FINISHED",
-                "seq": 2,
-                "payload": {}
-            });
-            let _ = send_protocol_line(&task_tx, event).await;
         }
 
         let final_payload = match terminal_snapshot {
@@ -685,7 +680,22 @@ fn read_max_concurrency() -> usize {
         .unwrap_or(8)
 }
 
-async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()> {
+fn read_stdin_timeout_ms(cli_timeout_ms: Option<u64>) -> u64 {
+    cli_timeout_ms
+        .or_else(|| {
+            std::env::var("ZENE_STDIN_TIMEOUT_MS")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+        })
+        .unwrap_or(15_000)
+}
+
+async fn run_host(
+    engine: Arc<ZeneEngine>,
+    protocol: &str,
+    single_request: bool,
+    stdin_timeout_ms: Option<u64>,
+) -> anyhow::Result<()> {
     if protocol != "v1" {
         anyhow::bail!("unsupported protocol: {}", protocol);
     }
@@ -710,11 +720,31 @@ async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()>
     let inflight_idempotency: Arc<Mutex<HashMap<String, String>>> =
         Arc::new(Mutex::new(HashMap::new()));
     let global_slots = Arc::new(Semaphore::new(read_max_concurrency()));
+    let input_timeout_ms = read_stdin_timeout_ms(stdin_timeout_ms);
+    let mut handled_any_request = false;
 
-    while let Some(line) = lines.next_line().await? {
+    loop {
+        let next_line = timeout(Duration::from_millis(input_timeout_ms), lines.next_line()).await;
+        let line = match next_line {
+            Ok(Ok(Some(line))) => line,
+            Ok(Ok(None)) => {
+                if handled_any_request {
+                    break;
+                }
+                anyhow::bail!("PROTOCOL: stdin EOF before request");
+            }
+            Ok(Err(e)) => anyhow::bail!("PROTOCOL: stdin read error: {}", e),
+            Err(_) => anyhow::bail!("PROTOCOL: stdin read timeout after {}ms", input_timeout_ms),
+        };
+
         if line.trim().is_empty() {
+            if single_request {
+                anyhow::bail!("PROTOCOL: empty input line");
+            }
             continue;
         }
+
+        handled_any_request = true;
 
         prune_idempotency_cache(&idempotency_store).await;
 
@@ -728,7 +758,7 @@ async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()>
                     &format!("invalid JSON payload: {}", e),
                 )
                 .await?;
-                continue;
+                anyhow::bail!("PROTOCOL: invalid JSON payload: {}", e);
             }
         };
 
@@ -740,7 +770,7 @@ async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()>
                 "unsupported protocol_version (expected 1)",
             )
             .await?;
-            continue;
+            anyhow::bail!("PROTOCOL: unsupported protocol_version");
         }
 
         match req.request_type.as_str() {
@@ -831,6 +861,8 @@ async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()>
                     idempotency_store.clone(),
                     inflight_idempotency.clone(),
                     global_slots.clone(),
+                    !single_request,
+                    single_request,
                     req,
                 )
                 .await
@@ -854,14 +886,25 @@ async fn run_host(engine: Arc<ZeneEngine>, protocol: &str) -> anyhow::Result<()>
                     "unsupported request type",
                 )
                 .await?;
+                if single_request {
+                    anyhow::bail!("PROTOCOL: unsupported request type");
+                }
             }
+        }
+
+        if single_request {
+            break;
         }
     }
 
     {
         let mut active = active_runs.lock().await;
-        for (_, run) in active.drain() {
-            run.handle.abort();
+        let handles: Vec<_> = active.drain().map(|(_, run)| run.handle).collect();
+        drop(active);
+        for handle in handles {
+            if let Err(e) = handle.await {
+                error!("Host run task join error: {}", e);
+            }
         }
     }
 
@@ -901,8 +944,20 @@ async fn main() -> anyhow::Result<()> {
 
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let storage_dir = PathBuf::from(&home).join(".zene/sessions");
-    let store = Arc::new(FileSessionStore::new(storage_dir)?);
-    let engine = Arc::new(ZeneEngine::new(config, store).await?);
+    let store = match FileSessionStore::new(storage_dir) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            error!("Failed to initialize session store: {}", e);
+            std::process::exit(EXIT_RUNTIME_ERROR);
+        }
+    };
+    let engine = match ZeneEngine::new(config, store).await {
+        Ok(e) => Arc::new(e),
+        Err(e) => {
+            error!("Failed to initialize engine: {}", e);
+            std::process::exit(EXIT_RUNTIME_ERROR);
+        }
+    };
 
     let cli = Cli::parse();
 
@@ -920,20 +975,39 @@ async fn main() -> anyhow::Result<()> {
 
                 match engine.run(req).await {
                     Ok(result) => println!("{}", result.output),
-                    Err(e) => error!("Task failed: {}", e),
+                    Err(e) => {
+                        error!("Task failed: {}", e);
+                        std::process::exit(EXIT_RUNTIME_ERROR);
+                    }
                 }
             }
             Commands::Worker => {
-                Worker::run(engine.as_ref()).await?;
+                if let Err(e) = Worker::run(engine.as_ref()).await {
+                    error!("Worker failed: {}", e);
+                    std::process::exit(EXIT_RUNTIME_ERROR);
+                }
             }
-            Commands::Host { protocol } => {
+            Commands::Host {
+                protocol,
+                single_request,
+                stdin_timeout_ms,
+            } => {
                 info!("Starting host mode with protocol={}", protocol);
-                run_host(engine, &protocol).await?;
+                if let Err(e) = run_host(engine, &protocol, single_request, stdin_timeout_ms).await
+                {
+                    let message = e.to_string();
+                    error!("Host failed: {}", message);
+                    if message.starts_with("PROTOCOL:") {
+                        std::process::exit(EXIT_PROTOCOL_ERROR);
+                    }
+                    std::process::exit(EXIT_RUNTIME_ERROR);
+                }
             }
         }
     } else {
         use clap::CommandFactory;
         Cli::command().print_help()?;
+        std::process::exit(EXIT_OK);
     }
 
     Ok(())
