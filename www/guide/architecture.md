@@ -2,7 +2,7 @@
 
 Zene is a high-performance, embeddable agent execution engine designed for precision, speed, and control. Its architecture is divided into clear layers, from the high-level host interaction down to the low-level infrastructure.
 
-![Zene Architecture](/images/design/architecture.png)
+![Zene Architecture](/images/demo-terminal.svg)
 
 ## 1. Core Philosophy
 - **Embeddable Runtime**: Zene should work in-process or behind a thin worker process.
